@@ -108,7 +108,7 @@ struct OrderedArgument {
     argument_type: ArgumentType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum WrapType {
     None,
     Option,
@@ -150,21 +150,15 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                 });
             }
             ActionType::OrderedArgs(ordered_args) => {
-                // Output like this, e.g. for this
-                // TwoArgs(1, 2)
-                /*
+                // Before we can parse the arguments, we need to know how many there are.
 
-                Ok(Commands::TwoArgs({
-                    let arg_str = iter.next().ok_or(Error::NotEnoughArguments(name.to_string()))?;
-                    arg_str.parse().map_err(|err| Error::Conversion(name.to_string(), err))?
-                }, {
-                    let arg_str = iter.next().ok_or(Error::NotEnoughArguments(name.to_string()))?;
-                    arg_str.parse().map_err(|err| Error::Conversion(name.to_string(), err))?
-                }))
-                 */
+                let required_args = ordered_args.iter().filter(|arg| arg.wrap_type == WrapType::None).count();
+                let optional_args = ordered_args.iter().filter(|arg| arg.wrap_type == WrapType::Option).count();
+                let max_args = required_args + optional_args;
+
+                let mut final_arg_consumes_everything = false;
 
                 let mut args: Vec<TokenStream> = vec![];
-
                 for (idx, arg) in ordered_args.iter().enumerate() {
                     let is_last = idx == ordered_args.len() - 1;
 
@@ -174,6 +168,9 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                     let arg = match argument_type {
                         ArgumentType::String => {
                             if is_last {
+
+                                final_arg_consumes_everything = true;
+
                                 // Get all remaining arguments and join them.
                                 quote! {
                                     iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
@@ -216,8 +213,18 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                     args.push(arg);
                 }
 
-
                 tokens.push(quote! {
+                    let given_args = iter_args.len();
+
+                    eprintln!("given_args: {}", given_args);
+                    eprintln!("required_args: {}", #required_args);
+                    eprintln!("optional_args: {}", #optional_args);
+                    eprintln!("max_args: {}", #max_args);
+
+                    if !#final_arg_consumes_everything && given_args > #max_args {
+                        return Err(::slowchop_console::Error::TooManyArguments(#name_str.to_string()));
+                    }
+
                     Ok(Self::#name_ident(
                         #(#args),*
                     ))
