@@ -111,13 +111,22 @@ enum Console {
 #[derive(Commands, Debug, PartialEq)]
 enum Con {
     Quit,
-    // Echo(String),
+
+    Echo(String),
+    TwoStrings(String, String),
+    //
+    // /// Set or Get
+    // // TODO: ordered struct: Value { key: String, set_value: Option<String> }
+    GetOrSet(String, Option<String>),
+    //
+    // // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
+    // Concat(String, Vec<String>),
 }
 
 #[test]
 fn brainstorm() -> Result<(), Error> {
     assert_eq!(Con::resolve("quit")?, Con::Quit);
-    // assert_eq!(Con::resolve("echo sup"), Ok(Con::Echo("echo sup".into())));
+    assert_eq!(Con::resolve("echo sup")?, Con::Echo("echo sup".into()));
     // assert_eq!(Con::resolve(r#"echo "1 2""#), Ok(Con::Echo("1 2".into())));
 
     // assert_eq!(Commands::complete("qu"), vec!["quit", "query"]);
