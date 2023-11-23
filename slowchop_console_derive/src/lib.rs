@@ -1,122 +1,12 @@
-/*
-#[derive(Commands)]
-enum Console {
-    // /quit
-    // /quit? -- will show the doc comment
-    Quit,
-
-    // /echo sup, how's it going?
-    // Note the spaces without quotes. If String is the last type, it will handle no quotes.
-    Echo(String),
-
-    // /query Cat -Enemy +Transform
-    // Prefix symbols are just implementation details for querying bevy (& With, ! Without, ? Optional, * Changed, + Added, - Removed, etc )
-    Query(Vec<String>),
-
-    // /complex-query component Apple without Transform
-
-    // /fixed-first-then-vec 1 "string 1" "string 2" "string 3"
-    FixedFirstThenVec(i32, Vec<String>),
-
-    // Won't compile because ambiguous
-    // Query(Vec<f32>, Vec<String>),
-
-    // /two-strings "string 1" string 2
-    // /two-strings "string 1" "string 2"
-    // Again, last string can be free of quotes when it has spaces.
-    TwoStrings(String, String),
-
-    // /two-floats 1.2 3.5
-    TwoFloats(f32, f64),
-
-    // /optional-second first
-    // /optional-second first second
-    OptionalSecond(String, Option<String>),
-    // This won't compile because it becomes ambiguous
-    // ErrorThis(Option<String>, String),
-
-    // /spawn Ant
-    // Spawn(Thing),
-
-}
-
-// enum Thing {
-//     Apple,
-//     Ant,
-//     Banana,
-// }
-
-// This is how the macro would generate the code
-// impl Commands {
-//     pub fn resolve(s: &str) -> Result<Self, crate::Error> {
-//         let mut iter = s.split_whitespace();
-//         let command = iter.next()?;
-//         let args = iter.collect::<Vec<_>>();
-//
-//         match command {
-//             "quit" => Some(Commands::Quit),
-//             "echo" => Some(Commands::Echo(args.join(" "))),
-//             "query" => Some(Commands::Query(args.iter().map(|s| s.to_string()).collect())),
-//             "fixed-first-then-vec" => {
-//                 let first = args[0].parse().ok()?;
-//                 let rest = args[1..].iter().map(|s| s.to_string()).collect();
-//                 Some(Commands::FixedFirstThenVec(first, rest))
-//             },
-//             "two-strings" => Some(Commands::TwoStrings(args[0].to_string(), args[1].to_string())),
-//             "two-floats" => {
-//                 let a = args[0].parse().ok()?;
-//                 let b = args[1].parse().ok()?;
-//                 Some(Commands::TwoFloats(a, b))
-//             },
-//             "optional-second" => Some(Commands::OptionalSecond(args[0].to_string(), args.get(1).map(|s| s.to_string()))),
-//             _ => None,
-//         }
-//     }
-// }
-
-// struct StructIdea {
-//     a: String,
-//     b: Option<f32>,
-//     c: bool,
-// }
-//
-// struct AnotherStruct {
-//     d: usize,
-// }
-//
-// struct DeepStruct {
-//     struct_idea: StructIdea,
-//     another_struct: AnotherStruct,
-// }
-//
-// enum QueryArg {
-//     Component(String),
-//     With(String),
-//     Without(String),
-// }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use bevy::prelude::Vec3;
-
-    #[test]
-    fn brainstorm() {
-        assert_eq!(Console::resolve("quit"), Ok(Commands::Quit));
-        assert_eq!(Console::resolve("echo sup"), Ok(Console::Echo("echo sup".to_string())));
-        assert_eq!(Console::resolve(r#""echo sup""#), Ok(Console::Echo("echo sup".to_string())));
-    }
-}
-
- */
 extern crate proc_macro;
 
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments};
 
-#[proc_macro_derive(Commands)]
-pub fn commands_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(Actions)]
+pub fn actions_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let output: TokenStream = commands(&input);
@@ -134,14 +24,8 @@ impl Action {
     fn from_variant(variant: &syn::Variant) -> Action {
         let name = variant.ident.to_string();
 
-        if variant.fields.len() == 0 {
-            return Action {
-                name,
-                action_type: ActionType::NoArgs,
-            };
-        }
-
         let action_type = match &variant.fields {
+            syn::Fields::Unit => ActionType::NoArgs,
             syn::Fields::Unnamed(fields) => {
                 let mut ordered_args = vec![];
 
@@ -203,7 +87,9 @@ impl Action {
 
                 ActionType::OrderedArgs(ordered_args)
             }
-            _ => panic!("Unknown fields: {:?}", variant.fields),
+            _ => {
+                panic!("Unknown fields: {:?}", variant.fields);
+            }
         };
 
         Action { name, action_type }
@@ -245,28 +131,118 @@ fn commands(ast: &DeriveInput) -> TokenStream {
         }
     };
 
-    let found: Vec<Action> = vec![];
+    let actions: Vec<Action> = variants.iter().map(|v| Action::from_variant(v)).collect();
 
-    for variant in variants.iter() {
-        let action = Action::from_variant(variant);
-        eprintln!("action: {:?}", action);
-    }
+    // TODO: Make sure there are no options after required arguments.
+    // TODO: Make sure Vec is only the last argument.
 
-    // let gen = quote! {
-    //     impl #name {
-    //         pub fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
-    //             let mut iter = s.split_whitespace();
-    //             let command = iter.next().ok_or_else(|| ::slowchop_console::Error::NoCommandGiven)?;
-    //             let args = iter.collect::<Vec<_>>();
-    //
-    //             match command {
-    //                 #(#collected => Ok(#name::#variants),)*
-    //                 _ => Err(::slowchop_console::Error::UnknownCommand(command.to_string())),
-    //             }
-    //         }
-    //     }
-    // };
-    // gen.into()
+    eprintln!("actions: {:#?}", actions);
 
-    TokenStream::new()
+    let action_quotes = actions.iter().map(|action| {
+        let name = &action.name;
+        let name = syn::Ident::new(name, name.span());
+
+        let mut tokens = vec![];
+        match &action.action_type {
+            ActionType::NoArgs => {
+                tokens.push(quote! {
+                    Commands::#name
+                });
+            }
+            ActionType::OrderedArgs(ordered_args) => {
+                // Output like this, e.g. for this
+                // TwoArgs(1, 2)
+                /*
+
+                Ok(Commands::TwoArgs({
+                    let arg_str = iter.next().ok_or(Error::NotEnoughArguments(name.to_string()))?;
+                    arg_str.parse().map_err(|err| Error::Conversion(name.to_string(), err))?
+                }, {
+                    let arg_str = iter.next().ok_or(Error::NotEnoughArguments(name.to_string()))?;
+                    arg_str.parse().map_err(|err| Error::Conversion(name.to_string(), err))?
+                }))
+                 */
+
+                let mut args: Vec<TokenStream> = vec![];
+
+                for arg in ordered_args {
+                    let argument_type = &arg.argument_type;
+                    let wrap_type = &arg.wrap_type;
+
+                    // let arg_name = syn::Ident::new("arg_str", name.span());
+
+                    let arg = match argument_type {
+                        ArgumentType::String => {
+                            quote! {
+                                iter.next().unwrap().to_string()
+                            }
+                        }
+                        ArgumentType::Float32 => {
+                            quote! {
+                                // #arg_name.parse().map_err(|err| Error::Conversion(name.to_string(), err))?
+                                todo!()
+                            }
+                        }
+                    };
+
+                    let arg = match wrap_type {
+                        WrapType::None => {
+                            quote! {
+                                #arg
+                            }
+                        }
+                        WrapType::Option => {
+                            quote! {
+                                Some(#arg)
+                            }
+                        }
+                        WrapType::Vec => {
+                            quote! {
+                                vec![#arg]
+                            }
+                        }
+                    };
+
+                    args.push(arg);
+                }
+
+                tokens.push(quote! {
+                    Commands::#name
+                    (
+                        #(#args),*
+                    )
+                });
+            }
+        }
+
+        quote! {
+            #name => {
+                #(#tokens)*
+            }
+        }
+    });
+
+    let gen = quote! {
+        impl #name {
+            /// Resolve the given string into a command.
+            pub fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
+                let items = shlex::split(s).unwrap();
+                if items.len() == 0 {
+                    return Err(::slowchop_console::Error::NoCommandGiven);
+                }
+
+                let user_action = &items[0];
+                let rest = &items[1..];
+                let mut iter = rest.iter();
+
+                match user_action {
+                    #(#action_quotes)*
+                    _ => Err(::slowchop_console::Error::UnknownCommand(user_action.to_string())),
+                }
+
+            }
+        }
+    };
+
+    gen.into()
 }

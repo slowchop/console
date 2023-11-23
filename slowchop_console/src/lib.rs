@@ -1,4 +1,4 @@
-pub use slowchop_console_derive::Commands;
+pub use slowchop_console_derive::Actions;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -7,4 +7,10 @@ pub enum Error {
 
     #[error("Unknown command: {0}")]
     UnknownCommand(String),
+
+    #[error("Not enough arguments for command: {0}")]
+    NotEnoughArguments(String),
+
+    #[error("Parse error: {0} {1}")]
+    ParseFloatError(String, #[source] std::num::ParseFloatError),
 }
