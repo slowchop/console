@@ -9,7 +9,7 @@ use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments};
 pub fn actions_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let output: TokenStream = commands(&input);
+    let output: TokenStream = actions(&input);
 
     proc_macro::TokenStream::from(output)
 }
@@ -121,13 +121,13 @@ enum ArgumentType {
     Float32,
 }
 
-fn commands(ast: &DeriveInput) -> TokenStream {
+fn actions(ast: &DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
     let variants = match &ast.data {
         syn::Data::Enum(data) => &data.variants,
         _ => {
-            panic!("Commands can only be derived for enums: {:?}", ast.ident);
+            panic!("Actions can only be derived for enums: {:?}", ast.ident);
         }
     };
 
@@ -139,14 +139,14 @@ fn commands(ast: &DeriveInput) -> TokenStream {
     eprintln!("actions: {:#?}", actions);
 
     let action_quotes = actions.iter().map(|action| {
-        let name = &action.name;
-        let name = syn::Ident::new(name, name.span());
+        let name_str = &action.name;
+        let name_ident = syn::Ident::new(name_str, name_str.span());
 
         let mut tokens = vec![];
         match &action.action_type {
             ActionType::NoArgs => {
                 tokens.push(quote! {
-                    Commands::#name
+                    Ok(Self::#name_ident)
                 });
             }
             ActionType::OrderedArgs(ordered_args) => {
@@ -169,12 +169,10 @@ fn commands(ast: &DeriveInput) -> TokenStream {
                     let argument_type = &arg.argument_type;
                     let wrap_type = &arg.wrap_type;
 
-                    // let arg_name = syn::Ident::new("arg_str", name.span());
-
                     let arg = match argument_type {
                         ArgumentType::String => {
                             quote! {
-                                iter.next().unwrap().to_string()
+                                iter_args.next().unwrap().to_string()
                             }
                         }
                         ArgumentType::Float32 => {
@@ -207,16 +205,15 @@ fn commands(ast: &DeriveInput) -> TokenStream {
                 }
 
                 tokens.push(quote! {
-                    Commands::#name
-                    (
+                    Ok(Self::#name_ident(
                         #(#args),*
-                    )
+                    ))
                 });
             }
         }
 
         quote! {
-            #name => {
+            #name_str => {
                 #(#tokens)*
             }
         }
@@ -232,10 +229,10 @@ fn commands(ast: &DeriveInput) -> TokenStream {
                 }
 
                 let user_action = &items[0];
-                let rest = &items[1..];
-                let mut iter = rest.iter();
+                let user_args = &items[1..];
+                let mut iter_args = user_args.iter();
 
-                match user_action {
+                match user_action.as_str() {
                     #(#action_quotes)*
                     _ => Err(::slowchop_console::Error::UnknownCommand(user_action.to_string())),
                 }
