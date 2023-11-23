@@ -146,6 +146,10 @@ fn actions(ast: &DeriveInput) -> TokenStream {
         match &action.action_type {
             ActionType::NoArgs => {
                 tokens.push(quote! {
+                    if iter_args.len() > 0 {
+                        return Err(::slowchop_console::Error::TooManyArguments(#name_str.to_string()));
+                    }
+
                     Ok(Self::#name_ident)
                 });
             }
@@ -168,7 +172,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                     let arg = match argument_type {
                         ArgumentType::String => {
                             if is_last {
-
                                 final_arg_consumes_everything = true;
 
                                 // Get all remaining arguments and join them.

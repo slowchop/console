@@ -109,8 +109,15 @@ use slowchop_console::{Actions, Error};
 // }
 
 #[test]
-fn brainstorm() -> Result<(), Error> {
+fn resolve_unit() -> Result<(), Error> {
     assert_eq!(Con::resolve("Quit")?, Con::Quit);
+    assert!(Con::resolve("Quit hmm").is_err());
+
+    Ok(())
+}
+
+#[test]
+fn resolve_single_string() -> Result<(), Error> {
     assert_eq!(Con::resolve("Echo sup")?, Con::Echo("sup".into()));
     assert_eq!(Con::resolve("Echo \"1 2 \"")?, Con::Echo("1 2 ".into()));
     assert_eq!(Con::resolve("Echo 1 2")?, Con::Echo("1 2".into()));
@@ -120,13 +127,24 @@ fn brainstorm() -> Result<(), Error> {
         Con::Echo("1 2 3".into())
     );
 
+    Ok(())
+}
+
+#[test]
+fn resolve_two_floats() -> Result<(), Error> {
     assert_eq!(Con::resolve("TwoFloats 1.2 3.5")?, Con::TwoFloats(1.2, 3.5));
+    assert_eq!(Con::resolve("TwoFloats 1 -5")?, Con::TwoFloats(1., -5.));
+
+    // Extra argument
     assert!(Con::resolve("TwoFloats 1.2 3.5 5.5").is_err());
 
+    Ok(())
+}
+
+#[test]
+fn complete() {
     // assert_eq!(Commands::complete("qu"), vec!["quit", "query"]);
     // assert_eq!(Commands::complete("spawn a"), vec!["pple", "nt"]);
-
-    Ok(())
 }
 
 #[derive(Debug, PartialEq, Actions)]
