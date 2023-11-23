@@ -165,20 +165,32 @@ fn actions(ast: &DeriveInput) -> TokenStream {
 
                 let mut args: Vec<TokenStream> = vec![];
 
-                for arg in ordered_args {
+                for (idx, arg) in ordered_args.iter().enumerate() {
+                    let is_last = idx == ordered_args.len() - 1;
+
                     let argument_type = &arg.argument_type;
                     let wrap_type = &arg.wrap_type;
 
                     let arg = match argument_type {
                         ArgumentType::String => {
-                            quote! {
-                                iter_args.next().unwrap().to_string()
+                            if is_last {
+                                // Get all remaining arguments and join them.
+                                quote! {
+                                    iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
+                                }
+                            } else {
+                                quote! {
+                                    iter_args.next().unwrap().to_string()
+                                }
                             }
                         }
                         ArgumentType::Float32 => {
                             quote! {
-                                // #arg_name.parse().map_err(|err| Error::Conversion(name.to_string(), err))?
-                                todo!()
+                                iter_args
+                                    .next()
+                                    .ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?
+                                    .parse()
+                                    .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
                             }
                         }
                     };
@@ -203,6 +215,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
 
                     args.push(arg);
                 }
+
 
                 tokens.push(quote! {
                     Ok(Self::#name_ident(

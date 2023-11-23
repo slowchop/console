@@ -114,6 +114,14 @@ fn brainstorm() -> Result<(), Error> {
     assert_eq!(Con::resolve("Echo sup")?, Con::Echo("sup".into()));
     assert_eq!(Con::resolve("Echo \"1 2 \"")?, Con::Echo("1 2 ".into()));
     assert_eq!(Con::resolve("Echo 1 2")?, Con::Echo("1 2".into()));
+    // TODO: Should this be an error, or just let it join the two last quotes as one?
+    assert_eq!(
+        Con::resolve("Echo \"1 2\" \"3\"")?,
+        Con::Echo("1 2 3".into())
+    );
+
+    assert_eq!(Con::resolve("TwoFloats 1.2 3.5")?, Con::TwoFloats(1.2, 3.5));
+    assert!(Con::resolve("TwoFloats 1.2 3.5 5.5").is_err());
 
     // assert_eq!(Commands::complete("qu"), vec!["quit", "query"]);
     // assert_eq!(Commands::complete("spawn a"), vec!["pple", "nt"]);
@@ -126,6 +134,7 @@ enum Con {
     Quit,
     Echo(String),
     TwoStrings(String, String),
+    TwoFloats(f32, f32),
     //
     // /// Set or Get
     // // TODO: ordered struct: Value { key: String, set_value: Option<String> }
