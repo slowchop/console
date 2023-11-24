@@ -232,26 +232,26 @@ fn actions(ast: &DeriveInput) -> TokenStream {
 
                             match argument_type {
                                 ArgumentType::String => {
-                                    //     iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
                                     quote! {
-                                        vec!["XXXXX".to_string()]
+                                        iter_args.map(|s| s.to_string()).collect::<Vec<_>>()
                                     }
                                 }
                                 ArgumentType::Float32 => {
-                                    //     iter_args
-                                    //         .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
-                                    //         .collect::<Result<Vec<_>, _>>()?
                                     quote! {
-                                        vec![1.23456f32]
+                                        iter_args
+                                            .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
+                                            .collect::<Result<Vec<_>, _>>()?
                                     }
                                 }
                                 ArgumentType::ISize => {
-                                    // iter_args
-                                    //     .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err)))
-                                    //     .collect::<Result<Vec<_>, _>>()?
                                     quote! {
-                                        vec![-1231231]
+                                        iter_args
+                                            .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err)))
+                                            .collect::<Result<Vec<_>, _>>()?
                                     }
+
+                                    // eprintln!("isize iter args: {iter_args:#?}");
+
                                 }
                             }
 

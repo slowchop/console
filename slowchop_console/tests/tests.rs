@@ -142,7 +142,17 @@ fn resolve_two_floats() -> Result<(), Error> {
 }
 
 #[test]
-fn array() -> Result<(), Error> {
+fn vec() -> Result<(), Error> {
+    assert_eq!(
+        Con::resolve("VecString a b 'c c'")?,
+        Con::VecString(vec!["a".to_string(), "b".to_string(), "c c".to_string()])
+    );
+
+    assert_eq!(
+        Con::resolve("VecFloat32 1.1 2.2 3.3")?,
+        Con::VecFloat32(vec![1.1, 2.2, 3.3])
+    );
+
     assert_eq!(
         Con::resolve("VecISize 1 2 3")?,
         Con::VecISize(vec![1, 2, 3])
@@ -163,6 +173,8 @@ enum Con {
     Echo(String),
     TwoStrings(String, String),
     TwoFloats(f32, f32),
+    VecString(Vec<String>),
+    VecFloat32(Vec<f32>),
     VecISize(Vec<isize>),
     //
     // /// Set or Get
