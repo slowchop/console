@@ -216,11 +216,27 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                             if has_seen_option {
                                 panic!("Required arguments must come before optional arguments: {:?}", ordered_args);
                             }
-                            parse_argument_type(argument_type, is_last, &name_str)
+                            parse_argument_type(argument_type, false, is_last, &name_str)
                         }
                         WrapType::Option => {
                             has_seen_option = true;
-                            parse_argument_type(argument_type, is_last, &name_str)
+                            eprintln!("------argument type: {argument_type:#?}");
+                            // parse_argument_type(argument_type, true, is_last, &name_str)
+
+                            match argument_type {
+                                ArgumentType::String => {quote!{}}
+                                ArgumentType::Float32 => {
+                                    quote! {
+                                        iter_args.next().map(|v| {
+                                            v.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))
+                                        }).transpose()?
+                                    }
+                                }
+                                ArgumentType::ISize => {
+                                    quote!{ 234 }
+                                }
+                            }
+
                         }
                         WrapType::Vec => {
                             if !is_last {
@@ -249,9 +265,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                             .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err)))
                                             .collect::<Result<Vec<_>, _>>()?
                                     }
-
-                                    // eprintln!("isize iter args: {iter_args:#?}");
-
                                 }
                             }
 
@@ -349,7 +362,12 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     gen.into()
 }
 
-fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &str) -> TokenStream {
+fn parse_argument_type(
+    argument_type: &ArgumentType,
+    is_optional: bool,
+    is_last: bool,
+    name_str: &str,
+) -> TokenStream {
     match argument_type {
         ArgumentType::String => {
             if is_last {

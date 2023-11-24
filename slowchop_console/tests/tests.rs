@@ -118,14 +118,15 @@ fn resolve_unit() -> Result<(), Error> {
 
 #[test]
 fn resolve_single_string() -> Result<(), Error> {
-    // assert_eq!(Con::resolve("Echo sup")?, Con::Echo("sup".into()));
-    // assert_eq!(Con::resolve("Echo \"1 2 \"")?, Con::Echo("1 2 ".into()));
+    assert_eq!(Con::resolve("Echo sup")?, Con::Echo("sup".into()));
+    assert_eq!(Con::resolve("Echo \"1 2 \"")?, Con::Echo("1 2 ".into()));
     assert_eq!(Con::resolve("Echo 1 2")?, Con::Echo("1 2".into()));
-    // // TODO: Should this be an error, or just let it join the two last quotes as one?
-    // assert_eq!(
-    //     Con::resolve("Echo \"1 2\" \"3\"")?,
-    //     Con::Echo("1 2 3".into())
-    // );
+    // TODO: Should this be an error, or just let it join the two last quotes as one?
+    // Right now these strings will just concatenate with no error.
+    assert_eq!(
+        Con::resolve("Echo \"1 2\" \"3\"")?,
+        Con::Echo("1 2 3".into())
+    );
 
     Ok(())
 }
@@ -162,6 +163,29 @@ fn vec() -> Result<(), Error> {
 }
 
 #[test]
+fn optional_float() -> Result<(), Error> {
+    assert!(Con::resolve("OptionalFloat asdf").is_err());
+    assert_eq!(Con::resolve("OptionalFloat")?, Con::OptionalFloat(None));
+    assert_eq!(
+        Con::resolve("OptionalFloat 1.2")?,
+        Con::OptionalFloat(Some(1.2))
+    );
+
+    Ok(())
+}
+
+// #[test]
+// fn string_then_option() -> Result<(), Error> {
+//     assert_eq!(Con::resolve("GetOrSet a")?, Con::GetOrSet("a".into(), None));
+//     assert_eq!(
+//         Con::resolve("GetOrSet a b")?,
+//         Con::GetOrSet("a".into(), Some("b".into()))
+//     );
+//
+//     Ok(())
+// }
+
+#[test]
 fn complete() {
     // assert_eq!(Commands::complete("qu"), vec!["quit", "query"]);
     // assert_eq!(Commands::complete("spawn a"), vec!["pple", "nt"]);
@@ -176,11 +200,10 @@ enum Con {
     VecString(Vec<String>),
     VecFloat32(Vec<f32>),
     VecISize(Vec<isize>),
-    //
-    // /// Set or Get
-    // // TODO: ordered struct: Value { key: String, set_value: Option<String> }
+    OptionalFloat(Option<f32>),
+    // Set or Get
+    // TODO: ordered struct: Value { key: String, set_value: Option<String> }
     // GetOrSet(String, Option<String>),
-    //
-    // // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
+    // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
     // Concat(String, Vec<String>),
 }
