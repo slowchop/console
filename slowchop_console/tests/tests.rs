@@ -174,16 +174,45 @@ fn optional_float() -> Result<(), Error> {
     Ok(())
 }
 
-// #[test]
-// fn string_then_option() -> Result<(), Error> {
-//     assert_eq!(Con::resolve("GetOrSet a")?, Con::GetOrSet("a".into(), None));
-//     assert_eq!(
-//         Con::resolve("GetOrSet a b")?,
-//         Con::GetOrSet("a".into(), Some("b".into()))
-//     );
-//
-//     Ok(())
-// }
+#[test]
+fn two_optional_floats() -> Result<(), Error> {
+    assert!(Con::resolve("TwoOptionalFloats asdf").is_err());
+    assert_eq!(
+        Con::resolve("TwoOptionalFloats")?,
+        Con::TwoOptionalFloats(None, None)
+    );
+    assert_eq!(
+        Con::resolve("TwoOptionalFloats 1.2")?,
+        Con::TwoOptionalFloats(Some(1.2), None)
+    );
+    assert_eq!(
+        Con::resolve("TwoOptionalFloats 1.2 3.4")?,
+        Con::TwoOptionalFloats(Some(1.2), Some("3.4".into()))
+    );
+
+    Ok(())
+}
+
+#[test]
+fn required_then_optional() -> Result<(), Error> {
+    assert!(Con::resolve("RequiredThenOptional").is_err());
+    assert_eq!(
+        Con::resolve("RequiredThenOptional 'hi there'")?,
+        Con::RequiredThenOptional("hi there".into(), None)
+    );
+    assert_eq!(
+        Con::resolve("RequiredThenOptional 'hi there' 'string 2'")?,
+        Con::RequiredThenOptional("hi there".into(), Some("string 2".into()))
+    );
+
+    // Second argument without quotes should eat the rest of the words.
+    assert_eq!(
+        Con::resolve("RequiredThenOptional 'hi there' 1 2 3 4")?,
+        Con::RequiredThenOptional("hi there".into(), Some("1 2 3 4".into()))
+    );
+
+    Ok(())
+}
 
 #[test]
 fn complete() {
@@ -201,9 +230,10 @@ enum Con {
     VecFloat32(Vec<f32>),
     VecISize(Vec<isize>),
     OptionalFloat(Option<f32>),
-    // Set or Get
-    // TODO: ordered struct: Value { key: String, set_value: Option<String> }
-    // GetOrSet(String, Option<String>),
-    // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
+    TwoOptionalFloats(Option<f32>, Option<String>),
+    RequiredThenOptional(String, Option<String>),
     // Concat(String, Vec<String>),
+
+    // TODO: ordered struct: Value { key: String, set_value: Option<String> }
+    // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
 }

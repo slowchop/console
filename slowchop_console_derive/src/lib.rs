@@ -216,15 +216,32 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                             if has_seen_option {
                                 panic!("Required arguments must come before optional arguments: {:?}", ordered_args);
                             }
+                            eprintln!("- R E Q U I R E D -----argument type: {argument_type:#?}");
                             parse_argument_type(argument_type, false, is_last, &name_str)
                         }
                         WrapType::Option => {
                             has_seen_option = true;
-                            eprintln!("------argument type: {argument_type:#?}");
+                            eprintln!("- O P T I O N -----argument type: {argument_type:#?}");
                             // parse_argument_type(argument_type, true, is_last, &name_str)
 
                             match argument_type {
-                                ArgumentType::String => {quote!{}}
+                                ArgumentType::String => {
+                                    if is_last {
+                                        final_arg_consumes_everything = true;
+                                        quote! {
+                                            if iter_args.len() == 0 {
+                                                None
+                                            } else {
+                                                Some(iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" "))
+                                            }
+                                        }
+
+                                    } else {
+                                        quote! {
+                                            iter_args.next().map(|v| v.to_string())
+                                        }
+                                    }
+                                }
                                 ArgumentType::Float32 => {
                                     quote! {
                                         iter_args.next().map(|v| {
@@ -233,7 +250,11 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                     }
                                 }
                                 ArgumentType::ISize => {
-                                    quote!{ 234 }
+                                    quote! {
+                                        iter_args.next().map(|v| {
+                                            v.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))
+                                        }).transpose()?
+                                    }
                                 }
                             }
 
@@ -271,6 +292,8 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                         }
                     };
 
+                    eprintln!("arg: {}", arg.to_string());
+
                     if let ArgumentType::String = argument_type {
                         if let WrapType::None = wrap_type {
                             if is_last {
@@ -278,28 +301,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                             }
                         }
                     }
-
-                    // let arg = match wrap_type {
-                    //     WrapType::None => {
-                    //         quote! {
-                    //             #arg
-                    //         }
-                    //     }
-                    //     WrapType::Option => {
-                    //         quote! {
-                    //             Some(#arg)
-                    //         }
-                    //     }
-                    //     WrapType::Vec => {
-                    //         quote! {
-                    //             vec![#arg]
-                    //         }
-                    //     }
-                    // };
-
-                    let arg = quote!{
-                        #arg
-                    };
 
                     args.push(arg);
                 }
@@ -324,9 +325,9 @@ fn actions(ast: &DeriveInput) -> TokenStream {
         }
 
         // eprintln!("tokens: {:#?}", tokens);
-        for token in &tokens {
-            eprintln!("token: {}", token);
-        }
+        // for token in &tokens {
+        //     eprintln!("token: {}", token);
+        // }
 
         quote! {
             #name_str => {
@@ -377,7 +378,7 @@ fn parse_argument_type(
                 }
             } else {
                 quote! {
-                    iter_args.next().unwrap().to_string()
+                    iter_args.next().ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?.to_string()
                 }
             }
         }
