@@ -45,6 +45,10 @@ impl Action {
                                     wrap_type: WrapType::None,
                                     argument_type: ArgumentType::Float32,
                                 },
+                                "isize" => OrderedArgument {
+                                    wrap_type: WrapType::None,
+                                    argument_type: ArgumentType::ISize,
+                                },
                                 "Option" => {
                                     // We just want to handle "String", "f32", etc within the Option.
                                     let PathArguments::AngleBracketed(bracketed) =
@@ -68,11 +72,45 @@ impl Action {
                                     let argument_type = match ident.to_string().as_str() {
                                         "String" => ArgumentType::String,
                                         "f32" => ArgumentType::Float32,
-                                        _ => panic!("Unknown path type: {:?}", ident),
+                                        "isize" => ArgumentType::ISize,
+                                        _ => panic!("Unknown path type inside option: {:?}", ident),
                                     };
 
                                     OrderedArgument {
                                         wrap_type: WrapType::Option,
+                                        argument_type,
+                                    }
+                                }
+                                "Vec" => {
+                                    // We just want to handle "String", "f32", etc within the Vec.
+                                    let PathArguments::AngleBracketed(bracketed) =
+                                        &segment.arguments
+                                    else {
+                                        panic!(
+                                            "Expected angle bracketed arguments: {:?}",
+                                            segment.arguments
+                                        );
+                                    };
+                                    let arg = &bracketed.args[0];
+                                    let GenericArgument::Type(ty) = arg else {
+                                        panic!("Expected type: {:?}", arg);
+                                    };
+                                    let syn::Type::Path(path) = ty else {
+                                        panic!("Expected path: {:?}", ty);
+                                    };
+                                    let segment = path.path.segments.last().unwrap();
+                                    let ident = &segment.ident;
+
+                                    let argument_type = match ident.to_string().as_str() {
+                                        "String" => ArgumentType::String,
+                                        "f32" => ArgumentType::Float32,
+                                        "isize" => ArgumentType::ISize,
+
+                                        _ => panic!("Unknown path type inside vec: {:?}", ident),
+                                    };
+
+                                    OrderedArgument {
+                                        wrap_type: WrapType::Vec,
                                         argument_type,
                                     }
                                 }
@@ -119,6 +157,7 @@ enum WrapType {
 enum ArgumentType {
     String,
     Float32,
+    ISize,
 }
 
 fn actions(ast: &DeriveInput) -> TokenStream {
@@ -142,6 +181,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
         let name_str = &action.name;
         let name_ident = syn::Ident::new(name_str, name_str.span());
 
+        eprintln!("1111111 {:#?}", action);
         let mut tokens = vec![];
         match &action.action_type {
             ActionType::NoArgs => {
@@ -163,54 +203,89 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                 let mut final_arg_consumes_everything = false;
 
                 let mut args: Vec<TokenStream> = vec![];
+                let mut has_seen_option = false;
+
                 for (idx, arg) in ordered_args.iter().enumerate() {
                     let is_last = idx == ordered_args.len() - 1;
 
                     let argument_type = &arg.argument_type;
                     let wrap_type = &arg.wrap_type;
 
-                    let arg = match argument_type {
-                        ArgumentType::String => {
-                            if is_last {
-                                final_arg_consumes_everything = true;
-
-                                // Get all remaining arguments and join them.
-                                quote! {
-                                    iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
-                                }
-                            } else {
-                                quote! {
-                                    iter_args.next().unwrap().to_string()
-                                }
+                    let arg = match wrap_type {
+                        WrapType::None => {
+                            if has_seen_option {
+                                panic!("Required arguments must come before optional arguments: {:?}", ordered_args);
                             }
+                            parse_argument_type(argument_type, is_last, &name_str)
                         }
-                        ArgumentType::Float32 => {
-                            quote! {
-                                iter_args
-                                    .next()
-                                    .ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?
-                                    .parse()
-                                    .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
+                        WrapType::Option => {
+                            has_seen_option = true;
+                            parse_argument_type(argument_type, is_last, &name_str)
+                        }
+                        WrapType::Vec => {
+                            if !is_last {
+                                panic!("Vec can only be the last argument: {:?}", ordered_args);
                             }
+                            final_arg_consumes_everything = true;
+                            // parse_argument_type(argument_type, is_last, &name_str)
+                            // Iterate over the rest of the arguments, and parse them, depending on the type.
+
+                            match argument_type {
+                                ArgumentType::String => {
+                                    //     iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
+                                    quote! {
+                                        vec!["XXXXX".to_string()]
+                                    }
+                                }
+                                ArgumentType::Float32 => {
+                                    //     iter_args
+                                    //         .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
+                                    //         .collect::<Result<Vec<_>, _>>()?
+                                    quote! {
+                                        vec![1.23456f32]
+                                    }
+                                }
+                                ArgumentType::ISize => {
+                                    // iter_args
+                                    //     .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err)))
+                                    //     .collect::<Result<Vec<_>, _>>()?
+                                    quote! {
+                                        vec![-1231231]
+                                    }
+                                }
+                            }
+
                         }
                     };
 
-                    let arg = match wrap_type {
-                        WrapType::None => {
-                            quote! {
-                                #arg
+                    if let ArgumentType::String = argument_type {
+                        if let WrapType::None = wrap_type {
+                            if is_last {
+                                final_arg_consumes_everything = true;
                             }
                         }
-                        WrapType::Option => {
-                            quote! {
-                                Some(#arg)
-                            }
-                        }
-                        WrapType::Vec => {
-                            quote! {
-                                vec![#arg]
-                            }
-                        }
+                    }
+
+                    // let arg = match wrap_type {
+                    //     WrapType::None => {
+                    //         quote! {
+                    //             #arg
+                    //         }
+                    //     }
+                    //     WrapType::Option => {
+                    //         quote! {
+                    //             Some(#arg)
+                    //         }
+                    //     }
+                    //     WrapType::Vec => {
+                    //         quote! {
+                    //             vec![#arg]
+                    //         }
+                    //     }
+                    // };
+
+                    let arg = quote!{
+                        #arg
                     };
 
                     args.push(arg);
@@ -235,12 +310,19 @@ fn actions(ast: &DeriveInput) -> TokenStream {
             }
         }
 
+        // eprintln!("tokens: {:#?}", tokens);
+        for token in &tokens {
+            eprintln!("token: {}", token);
+        }
+
         quote! {
             #name_str => {
                 #(#tokens)*
             }
         }
     });
+
+    eprintln!("action_quotes: {:#?}", action_quotes);
 
     let gen = quote! {
         impl #name {
@@ -265,4 +347,39 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     };
 
     gen.into()
+}
+
+fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &str) -> TokenStream {
+    match argument_type {
+        ArgumentType::String => {
+            if is_last {
+                // Get all remaining arguments and join them.
+                quote! {
+                    iter_args.map(|s| s.to_string()).collect::<Vec<_>>().join(" ")
+                }
+            } else {
+                quote! {
+                    iter_args.next().unwrap().to_string()
+                }
+            }
+        }
+        ArgumentType::Float32 => {
+            quote! {
+                iter_args
+                    .next()
+                    .ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?
+                    .parse()
+                    .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
+            }
+        }
+        ArgumentType::ISize => {
+            quote! {
+                iter_args
+                    .next()
+                    .ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?
+                    .parse()
+                    .map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))?
+            }
+        }
+    }
 }

@@ -14,6 +14,9 @@ pub enum Error {
     #[error("Too many arguments for action: {0}")]
     TooManyArguments(String),
 
-    #[error("Parse error: {0} {1}")]
+    #[error("Parse float error: {0} {1}")]
     ParseFloatError(String, #[source] std::num::ParseFloatError),
+
+    #[error("Parse int error: {0} {1}")]
+    ParseIntError(String, #[source] std::num::ParseIntError),
 }
