@@ -175,13 +175,10 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     // TODO: Make sure there are no options after required arguments.
     // TODO: Make sure Vec is only the last argument.
 
-    eprintln!("actions: {:#?}", actions);
-
-    let action_quotes = actions.iter().map(|action| {
+    let resove_actions = actions.iter().map(|action| {
         let name_str = &action.name;
         let name_ident = syn::Ident::new(name_str, name_str.span());
 
-        eprintln!("1111111 {:#?}", action);
         let mut tokens = vec![];
         match &action.action_type {
             ActionType::NoArgs => {
@@ -217,7 +214,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                 panic!("Required arguments must come before optional arguments: {:?}", ordered_args);
                             }
                             eprintln!("- R E Q U I R E D -----argument type: {argument_type:#?}");
-                            parse_argument_type(argument_type, false, is_last, &name_str)
+                            parse_argument_type(argument_type, is_last, &name_str)
                         }
                         WrapType::Option => {
                             has_seen_option = true;
@@ -336,7 +333,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
         }
     });
 
-    eprintln!("action_quotes: {:#?}", action_quotes);
+    eprintln!("resove_actions: {:#?}", resove_actions);
 
     let gen = quote! {
         impl #name {
@@ -352,7 +349,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                 let mut iter_args = user_args.iter();
 
                 match user_action.as_str() {
-                    #(#action_quotes)*
+                    #(#resove_actions)*
                     _ => Err(::slowchop_console::Error::UnknownCommand(user_action.to_string())),
                 }
 
@@ -363,12 +360,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     gen.into()
 }
 
-fn parse_argument_type(
-    argument_type: &ArgumentType,
-    is_optional: bool,
-    is_last: bool,
-    name_str: &str,
-) -> TokenStream {
+fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &str) -> TokenStream {
     match argument_type {
         ArgumentType::String => {
             if is_last {
