@@ -155,32 +155,28 @@ fn setup_console<A>(
 ) where
     A: Send + Sync + 'static,
 {
-    let mut group = commands.spawn((Name::new("Console"), Group, SpatialBundle::default()));
-
-    let window = window.single();
-    let res = &window.resolution;
-    let custom_size = Vec2::new(res.width(), res.height() * console_state.expand_percentage);
-    let custom_size = Some(custom_size);
+    let mut group = commands.spawn((
+        Name::new("Console"),
+        Group,
+        NodeBundle {
+            style: Style {
+                width: Val::Percent(100.),
+                height: Val::Percent(console_state.expand_percentage * 100.),
+                flex_direction: FlexDirection::ColumnReverse,
+                ..default()
+            },
+            background_color: Color::PURPLE.into(),
+            ..default()
+        },
+    ));
 
     group.with_children(|parent| {
         parent.spawn((
-            Name::new("Background"),
-            Background,
-            SpriteBundle {
-                sprite: Sprite {
-                    color: Color::rgb(1.25, 0.25, 0.75),
-                    custom_size,
-                    ..default()
-                },
-                transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-                ..default()
-            },
-        ));
-
-        parent.spawn((
             Name::new("Input"),
             InputText,
-            Text2dBundle {
+            TextBundle {
+                style: Style { ..default() },
+                background_color: Color::BLACK.into(),
                 text: Text::from_section(
                     "",
                     TextStyle {
