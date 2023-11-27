@@ -145,6 +145,9 @@ struct Group;
 struct Background;
 
 #[derive(Component)]
+struct History;
+
+#[derive(Component)]
 struct InputText;
 
 fn setup_console<A>(
@@ -162,7 +165,7 @@ fn setup_console<A>(
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Percent(console_state.expand_percentage * 100.),
-                flex_direction: FlexDirection::ColumnReverse,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
             background_color: Color::PURPLE.into(),
@@ -173,8 +176,13 @@ fn setup_console<A>(
     group.with_children(|parent| {
         parent.spawn((
             Name::new("History"),
+            History,
             NodeBundle {
                 background_color: Color::INDIGO.into(),
+                style: Style {
+                    flex_grow: 1.,
+                    ..default()
+                },
                 ..default()
             },
         ));
@@ -183,7 +191,11 @@ fn setup_console<A>(
             Name::new("Input"),
             InputText,
             TextBundle {
-                style: Style { ..default() },
+                style: Style {
+                    flex_grow: 0.,
+                    height: Val::Px(30.),
+                    ..default()
+                },
                 background_color: Color::BLACK.into(),
                 text: Text::from_section(
                     "",
