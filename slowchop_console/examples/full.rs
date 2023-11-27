@@ -7,7 +7,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Actions, Clone, Debug, Event)]
-enum GameActions {
+enum MyGameActions {
     Help(String),
     List,
     Color,
@@ -15,7 +15,7 @@ enum GameActions {
 }
 
 pub fn main() {
-    let console_plugin = ConsolePlugin::<GameActions>::new();
+    let console_plugin = ConsolePlugin::<MyGameActions>::new();
 
     let default_filter = "info,fart=debug,wgpu=error,naga=warn".to_string();
     let filter_layer = EnvFilter::try_from_default_env()
@@ -43,13 +43,13 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-fn handle_actions(mut actions: EventReader<GameActions>) {
+fn handle_actions(mut actions: EventReader<MyGameActions>) {
     for action in actions.read() {
         match action {
-            GameActions::Help(text) => info!("Help: {}", text),
-            GameActions::List => info!("List"),
-            GameActions::Color => info!("Color"),
-            GameActions::Spawn(count) => info!("Spawn: {}", count),
+            MyGameActions::Help(text) => info!("Help: {}", text),
+            MyGameActions::List => info!("List"),
+            MyGameActions::Color => info!("Color"),
+            MyGameActions::Spawn(count) => info!("Spawn: {}", count),
         }
     }
 }

@@ -14,6 +14,11 @@ use std::time::Instant;
 use tracing_subscriber::layer::Context;
 use tracing_subscriber::Layer;
 
+pub struct EntityEntry {
+    pub entity: Entity,
+    pub entry: Entry,
+}
+
 pub struct Entry {
     pub when: Instant,
     pub level: Level,
@@ -22,9 +27,10 @@ pub struct Entry {
 
 #[derive(Resource)]
 pub struct Console<A> {
-    pub text: String,
+    pub input: String,
 
-    lines: Arc<Mutex<VecDeque<Entry>>>,
+    entity_entries: VecDeque<EntityEntry>,
+    queued_entries: Arc<Mutex<Vec<Entry>>>,
     pub max_lines: usize,
 
     /// The console is open if this is true.
@@ -40,10 +46,11 @@ pub struct Console<A> {
 }
 
 impl<A> Console<A> {
-    pub fn with_lines(lines: Arc<Mutex<VecDeque<Entry>>>) -> Self {
+    pub fn with_lines(queued_entries: Arc<Mutex<Vec<Entry>>>) -> Self {
         Console {
-            text: "help".to_string(),
-            lines,
+            input: "help".to_string(),
+            queued_entries,
+            entity_entries: Default::default(),
             max_lines: 1000,
             open: false,
             expand_percentage: 0.5,
@@ -59,12 +66,12 @@ impl<A> Console<A> {
 /// It will draw text starting from above the input, and scrolling up.
 /// The user can toggle the console with a key (e.g. tilde), but they control how that's done maybe
 /// via an event.
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
-    lines: Arc<Mutex<VecDeque<Entry>>>,
+    queued_entries: Arc<Mutex<Vec<Entry>>>,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -74,7 +81,7 @@ where
 {
     pub fn new() -> Self {
         ConsolePlugin {
-            lines: Arc::new(Mutex::new(Default::default())),
+            queued_entries: Arc::new(Mutex::new(Vec::new())),
             phantom_data: Default::default(),
         }
     }
@@ -86,7 +93,7 @@ where
 {
     fn build(&self, app: &mut App) {
         // app.init_resource::<Console<A>>();
-        app.insert_resource(Console::<A>::with_lines(self.lines.clone()));
+        app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
         app.add_event::<A>();
         app.add_event::<SubmittedText>();
         app.add_systems(Startup, (setup_console::<A>));
@@ -119,8 +126,8 @@ where
             message: visitor.0,
         };
 
-        let mut lines = self.lines.lock().unwrap();
-        lines.push_back(entry);
+        let mut lines = self.queued_entries.lock().unwrap();
+        lines.push(entry);
     }
 }
 
@@ -227,7 +234,7 @@ fn update_text<A>(
 {
     console.needs_update = false;
     let mut text = text_query.single_mut();
-    text.sections[0].value = console.text.clone();
+    text.sections[0].value = console.input.clone();
 }
 
 #[derive(Event, Debug)]
@@ -245,13 +252,13 @@ fn get_keyboard_input<A>(
 
         if key.char == '\r' {
             info!("Enter!");
-            submitted_text_writer.send(SubmittedText(console.text.clone()));
-            console.text.clear();
+            submitted_text_writer.send(SubmittedText(console.input.clone()));
+            console.input.clear();
         } else if key.char == '\u{7F}' {
             info!("Backspace!");
-            console.text.pop();
+            console.input.pop();
         } else {
-            console.text.push(key.char);
+            console.input.push(key.char);
         }
 
         console.needs_update = true;
