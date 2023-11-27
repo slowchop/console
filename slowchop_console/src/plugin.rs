@@ -1,14 +1,31 @@
 use crate::{ActionsImpl, Error};
 use bevy::ecs::system::SystemId;
 use bevy::input::keyboard::KeyboardInput;
+use bevy::log::Level;
 use bevy::prelude::*;
+use bevy::utils::tracing::field::{Field, Visit};
+use bevy::utils::tracing::Subscriber;
 use bevy::utils::HashMap;
 use bevy::window::PrimaryWindow;
+use std::collections::VecDeque;
 use std::fmt::Debug;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+use tracing_subscriber::layer::Context;
+use tracing_subscriber::Layer;
+
+pub struct Entry {
+    pub when: Instant,
+    pub level: Level,
+    pub message: String,
+}
 
 #[derive(Resource)]
 pub struct Console<A> {
     pub text: String,
+
+    lines: Arc<Mutex<VecDeque<Entry>>>,
+    pub max_lines: usize,
 
     /// The console is open if this is true.
     pub open: bool,
@@ -22,10 +39,12 @@ pub struct Console<A> {
     phantom_data: std::marker::PhantomData<A>,
 }
 
-impl<A> Default for Console<A> {
-    fn default() -> Self {
+impl<A> Console<A> {
+    pub fn with_lines(lines: Arc<Mutex<VecDeque<Entry>>>) -> Self {
         Console {
             text: "help".to_string(),
+            lines,
+            max_lines: 1000,
             open: false,
             expand_percentage: 0.5,
             needs_update: true,
@@ -40,11 +59,12 @@ impl<A> Default for Console<A> {
 /// It will draw text starting from above the input, and scrolling up.
 /// The user can toggle the console with a key (e.g. tilde), but they control how that's done maybe
 /// via an event.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
+    lines: Arc<Mutex<VecDeque<Entry>>>,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -54,6 +74,7 @@ where
 {
     pub fn new() -> Self {
         ConsolePlugin {
+            lines: Arc::new(Mutex::new(Default::default())),
             phantom_data: Default::default(),
         }
     }
@@ -64,7 +85,8 @@ where
     A: ActionsImpl + Debug + Event + Send + Sync + 'static,
 {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Console<A>>();
+        // app.init_resource::<Console<A>>();
+        app.insert_resource(Console::<A>::with_lines(self.lines.clone()));
         app.add_event::<A>();
         app.add_event::<SubmittedText>();
         app.add_systems(Startup, (setup_console::<A>));
@@ -77,6 +99,42 @@ where
             )
                 .chain(),
         );
+    }
+}
+
+impl<A, S> Layer<S> for ConsolePlugin<A>
+where
+    A: ActionsImpl + Debug + Event + Send + Sync + 'static,
+    S: Subscriber,
+{
+    fn on_event(&self, event: &bevy::utils::tracing::Event<'_>, _ctx: Context<'_, S>) {
+        let mut visitor = ConsoleVisitor::new();
+
+        let level = event.metadata().level();
+        event.record(&mut visitor);
+
+        let entry = Entry {
+            when: Instant::now(),
+            level: level.to_owned(),
+            message: visitor.0,
+        };
+
+        let mut lines = self.lines.lock().unwrap();
+        lines.push_back(entry);
+    }
+}
+
+struct ConsoleVisitor(String);
+
+impl ConsoleVisitor {
+    fn new() -> Self {
+        Self(String::new())
+    }
+}
+
+impl Visit for ConsoleVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
+        self.0.push_str(&format!("{:?} ", value));
     }
 }
 
