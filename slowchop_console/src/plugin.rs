@@ -1,11 +1,8 @@
 use crate::{ActionsImpl, Error};
-use bevy::ecs::system::SystemId;
-use bevy::input::keyboard::KeyboardInput;
 use bevy::log::Level;
 use bevy::prelude::*;
 use bevy::utils::tracing::field::{Field, Visit};
 use bevy::utils::tracing::Subscriber;
-use bevy::utils::HashMap;
 use bevy::window::PrimaryWindow;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -33,12 +30,14 @@ pub struct Console<A> {
     queued_entries: Arc<Mutex<Vec<Entry>>>,
     pub max_lines: usize,
 
+    pub font_size: f32,
+
     /// The console is open if this is true.
     pub open: bool,
 
     /// How far down the console will expand to, as a percentage of the screen height.
     /// 1.0 for expanding all the way down to the bottom. 0.5 for half way.
-    pub expand_percentage: f32,
+    pub expand_fraction: f32,
 
     needs_update: bool,
 
@@ -48,12 +47,13 @@ pub struct Console<A> {
 impl<A> Console<A> {
     pub fn with_lines(queued_entries: Arc<Mutex<Vec<Entry>>>) -> Self {
         Console {
-            input: "help".to_string(),
+            input: "".to_string(),
             queued_entries,
             entity_entries: Default::default(),
-            max_lines: 1000,
+            max_lines: 100,
+            font_size: 20.0,
             open: false,
-            expand_percentage: 0.5,
+            expand_fraction: 0.5,
             needs_update: true,
             phantom_data: Default::default(),
         }
@@ -92,7 +92,6 @@ where
     A: ActionsImpl + Debug + Event + Send + Sync + 'static,
 {
     fn build(&self, app: &mut App) {
-        // app.init_resource::<Console<A>>();
         app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
         app.add_event::<A>();
         app.add_event::<SubmittedText>();
@@ -100,11 +99,14 @@ where
         app.add_systems(
             Update,
             (
-                get_keyboard_input::<A>,
-                update_text::<A>.run_if(needs_update::<A>),
-                handle_submitted_text::<A>,
-            )
-                .chain(),
+                update_history::<A>,
+                (
+                    get_keyboard_input::<A>,
+                    update_input_text::<A>.run_if(needs_update::<A>),
+                    handle_submitted_text::<A>,
+                )
+                    .chain(),
+            ),
         );
     }
 }
@@ -159,20 +161,25 @@ struct InputText;
 
 fn setup_console<A>(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    console_state: Res<Console<A>>,
+    console: Res<Console<A>>,
     window: Query<&Window, With<PrimaryWindow>>,
 ) where
     A: Send + Sync + 'static,
 {
+    let window = window.single();
+
     let mut group = commands.spawn((
         Name::new("Console"),
         Group,
         NodeBundle {
             style: Style {
                 width: Val::Percent(100.),
-                height: Val::Percent(console_state.expand_percentage * 100.),
-                flex_direction: FlexDirection::Column,
+                height: Val::Px(
+                    window.resolution.height()
+                        * window.resolution.scale_factor() as f32
+                        * console.expand_fraction,
+                ),
+                flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
             background_color: Color::PURPLE.into(),
@@ -182,25 +189,12 @@ fn setup_console<A>(
 
     group.with_children(|parent| {
         parent.spawn((
-            Name::new("History"),
-            History,
-            NodeBundle {
-                background_color: Color::INDIGO.into(),
-                style: Style {
-                    flex_grow: 1.,
-                    ..default()
-                },
-                ..default()
-            },
-        ));
-
-        parent.spawn((
             Name::new("Input"),
             InputText,
             TextBundle {
                 style: Style {
                     flex_grow: 0.,
-                    height: Val::Px(30.),
+                    min_height: Val::Px(console.font_size),
                     ..default()
                 },
                 background_color: Color::BLACK.into(),
@@ -208,11 +202,26 @@ fn setup_console<A>(
                     "",
                     TextStyle {
                         color: Color::ANTIQUE_WHITE,
-                        font_size: 30.0,
+                        font_size: console.font_size,
                         ..default()
                     },
                 ),
                 transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
+                ..default()
+            },
+        ));
+
+        parent.spawn((
+            Name::new("History"),
+            History,
+            NodeBundle {
+                background_color: Color::INDIGO.into(),
+                style: Style {
+                    overflow: Overflow::clip_y(),
+                    flex_direction: FlexDirection::Column,
+                    align_content: AlignContent::FlexStart,
+                    ..default()
+                },
                 ..default()
             },
         ));
@@ -226,7 +235,7 @@ where
     console.needs_update
 }
 
-fn update_text<A>(
+fn update_input_text<A>(
     mut console: ResMut<Console<A>>,
     mut text_query: Query<&mut Text, With<InputText>>,
 ) where
@@ -235,6 +244,70 @@ fn update_text<A>(
     console.needs_update = false;
     let mut text = text_query.single_mut();
     text.sections[0].value = console.input.clone();
+}
+
+fn update_history<A>(
+    mut commands: Commands,
+    mut console: ResMut<Console<A>>,
+    mut history_query: Query<Entity, With<History>>,
+    mut text_query: Query<(Entity, &mut Text), Without<History>>,
+) where
+    A: Send + Sync + 'static,
+{
+    // Mutex lock and remove all items from queued vec.
+    let new_entries = {
+        let mut queued_entries = console.queued_entries.lock().unwrap();
+        std::mem::take(&mut *queued_entries)
+    };
+
+    if new_entries.is_empty() {
+        return;
+    }
+
+    let history = history_query.single_mut();
+
+    // For each new item, spawn a new entity with a Text component and add it to the children of the
+    // history node.
+    for entry in new_entries {
+        let color = match entry.level {
+            Level::TRACE => Color::WHITE,
+            Level::DEBUG => Color::GRAY,
+            Level::INFO => Color::LIME_GREEN,
+            Level::WARN => Color::YELLOW,
+            Level::ERROR => Color::RED,
+        };
+
+        let entity = commands
+            .spawn((
+                Name::new("HistoryItem"),
+                TextBundle {
+                    text: Text::from_section(
+                        &entry.message,
+                        TextStyle {
+                            color,
+                            font_size: console.font_size,
+                            ..default()
+                        },
+                    ),
+                    ..default()
+                },
+            ))
+            .id();
+
+        commands.entity(history).push_children(&[entity]);
+
+        console
+            .entity_entries
+            .push_back(EntityEntry { entity, entry });
+    }
+
+    // Check for older items that need to be removed from the history node. Remove them from the
+    // children and destroy them.
+    while console.entity_entries.len() > console.max_lines {
+        if let Some(entry) = console.entity_entries.pop_front() {
+            commands.entity(entry.entity).despawn_recursive();
+        }
+    }
 }
 
 #[derive(Event, Debug)]
@@ -248,14 +321,10 @@ fn get_keyboard_input<A>(
     A: Send + Sync + 'static,
 {
     for key in key_events.read() {
-        info!("Key: {key:?}");
-
         if key.char == '\r' {
-            info!("Enter!");
             submitted_text_writer.send(SubmittedText(console.input.clone()));
             console.input.clear();
         } else if key.char == '\u{7F}' {
-            info!("Backspace!");
             console.input.pop();
         } else {
             console.input.push(key.char);
@@ -266,24 +335,13 @@ fn get_keyboard_input<A>(
 }
 
 fn handle_submitted_text<A>(
-    mut commands: Commands,
-    mut console: ResMut<Console<A>>,
     mut submitted_text_reader: EventReader<SubmittedText>,
     mut actions_writer: EventWriter<A>,
 ) where
     A: ActionsImpl + Event + Debug + Send + Sync + 'static,
 {
     for text in submitted_text_reader.read() {
-        // let Some(parts) = shlex::split(&text.0) else {
-        //     error!("Could not parse text: {text:?}");
-        //     continue;
-        // };
-        // let name = &parts[0];
-        // let args = &parts[1..];
-
-        let r = A::resolve(&text.0);
-
-        match r {
+        match A::resolve(&text.0) {
             Ok(action) => {
                 info!("yay Action: {:?}", action);
                 actions_writer.send(action);

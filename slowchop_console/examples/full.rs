@@ -31,7 +31,7 @@ pub fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<LogPlugin>(),
-            WorldInspectorPlugin::new(),
+            // WorldInspectorPlugin::new(),
             console_plugin,
         ))
         .add_systems(Startup, setup_camera)
