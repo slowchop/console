@@ -172,6 +172,14 @@ fn setup_console<A>(
 
     group.with_children(|parent| {
         parent.spawn((
+            Name::new("History"),
+            NodeBundle {
+                background_color: Color::INDIGO.into(),
+                ..default()
+            },
+        ));
+
+        parent.spawn((
             Name::new("Input"),
             InputText,
             TextBundle {
