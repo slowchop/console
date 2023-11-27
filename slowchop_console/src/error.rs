@@ -1,20 +1,13 @@
-use crate::Action;
-
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("No action given")]
     NoCommandGiven,
 
-    #[error("Unknown action: {command} with args: {args:?}")]
-    UnknownAction { command: String, args: Vec<String> },
+    #[error("Unknown action: {action}")]
+    UnknownAction { action: String },
 
-    #[error("Not enough arguments for action: {action} expected {expected} given {given}. Full args: {args:?}")]
-    NotEnoughArguments {
-        action: String,
-        args: Vec<String>,
-        expected: usize,
-        given: usize,
-    },
+    #[error("Not enough arguments for action: {action}")]
+    NotEnoughArguments { action: String },
 
     #[error("Too many arguments for action: {0}")]
     TooManyArguments(String),

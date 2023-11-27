@@ -336,9 +336,9 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     eprintln!("resove_actions: {:#?}", resove_actions);
 
     let gen = quote! {
-        impl #name {
+        impl ::slowchop_console::ActionsImpl for #name {
             /// Resolve the given string into a command.
-            pub fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
+            fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
                 let items = shlex::split(s).unwrap();
                 if items.len() == 0 {
                     return Err(::slowchop_console::Error::NoCommandGiven);
@@ -350,7 +350,9 @@ fn actions(ast: &DeriveInput) -> TokenStream {
 
                 match user_action.as_str() {
                     #(#resove_actions)*
-                    _ => Err(::slowchop_console::Error::UnknownCommand(user_action.to_string())),
+                    _ => Err(::slowchop_console::Error::UnknownAction {
+                        action: user_action.to_string()
+                    }),
                 }
 
             }
@@ -370,7 +372,9 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                 }
             } else {
                 quote! {
-                    iter_args.next().ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?.to_string()
+                    iter_args.next().ok_or(::slowchop_console::Error::NotEnoughArguments{
+                        action: #name_str.to_string(),
+                    })?.to_string()
                 }
             }
         }
@@ -378,7 +382,9 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
             quote! {
                 iter_args
                     .next()
-                    .ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?
+                    .ok_or(::slowchop_console::Error::NotEnoughArguments{
+                        action: #name_str.to_string()
+                    })?
                     .parse()
                     .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
             }
@@ -387,7 +393,9 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
             quote! {
                 iter_args
                     .next()
-                    .ok_or(::slowchop_console::Error::NotEnoughArguments(#name_str.to_string()))?
+                    .ok_or(::slowchop_console::Error::NotEnoughArguments {
+                        action: #name_str.to_string()
+                    })?
                     .parse()
                     .map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))?
             }

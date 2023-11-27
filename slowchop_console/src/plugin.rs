@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{ActionsImpl, Error};
 use bevy::ecs::system::SystemId;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
@@ -6,15 +6,8 @@ use bevy::utils::HashMap;
 use bevy::window::PrimaryWindow;
 use std::fmt::Debug;
 
-pub trait Action {
-    // fn new(&self) -> Box<dyn Action + Send + Sync>;
-    fn name(&self) -> &'static str;
-    fn parse(&mut self, s: &[String]) -> Result<(), Error>;
-    // fn help(&self, args: &str) -> String {}
-}
-
 #[derive(Resource)]
-pub struct Console {
+pub struct Console<A> {
     pub text: String,
 
     /// The console is open if this is true.
@@ -24,29 +17,19 @@ pub struct Console {
     /// 1.0 for expanding all the way down to the bottom. 0.5 for half way.
     pub expand_percentage: f32,
 
-    actions: HashMap<String, SystemId>,
     needs_update: bool,
+
+    phantom_data: std::marker::PhantomData<A>,
 }
 
-impl Console {
-    pub fn register_action<A: Action + Event + Default + Send + Sync + 'static>(
-        &mut self,
-        commands: &mut Commands,
-    ) {
-        // self.actions.push(Box::new(A::default()));
-        // commands.init_resource::<Events<A>>();
-        todo!()
-    }
-}
-
-impl Default for Console {
+impl<A> Default for Console<A> {
     fn default() -> Self {
         Console {
             text: "help".to_string(),
             open: false,
             expand_percentage: 0.5,
-            actions: Default::default(),
             needs_update: true,
+            phantom_data: Default::default(),
         }
     }
 }
@@ -58,19 +41,39 @@ impl Default for Console {
 /// The user can toggle the console with a key (e.g. tilde), but they control how that's done maybe
 /// via an event.
 #[derive(Default)]
-pub struct ConsolePlugin;
+pub struct ConsolePlugin<A>
+where
+    A: Send + Sync + 'static,
+{
+    phantom_data: std::marker::PhantomData<A>,
+}
 
-impl Plugin for ConsolePlugin {
+impl<A> ConsolePlugin<A>
+where
+    A: Send + Sync + 'static,
+{
+    pub fn new() -> Self {
+        ConsolePlugin {
+            phantom_data: Default::default(),
+        }
+    }
+}
+
+impl<A> Plugin for ConsolePlugin<A>
+where
+    A: ActionsImpl + Debug + Event + Send + Sync + 'static,
+{
     fn build(&self, app: &mut App) {
-        app.init_resource::<Console>();
+        app.init_resource::<Console<A>>();
+        app.add_event::<A>();
         app.add_event::<SubmittedText>();
-        app.add_systems(Startup, (setup_console));
+        app.add_systems(Startup, (setup_console::<A>));
         app.add_systems(
             Update,
             (
-                get_keyboard_input,
-                update_text.run_if(needs_update),
-                handle_submitted_text,
+                get_keyboard_input::<A>,
+                update_text::<A>.run_if(needs_update::<A>),
+                handle_submitted_text::<A>,
             )
                 .chain(),
         );
@@ -86,12 +89,14 @@ struct Background;
 #[derive(Component)]
 struct InputText;
 
-fn setup_console(
+fn setup_console<A>(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    console_state: Res<Console>,
+    console_state: Res<Console<A>>,
     window: Query<&Window, With<PrimaryWindow>>,
-) {
+) where
+    A: Send + Sync + 'static,
+{
     let mut group = commands.spawn((Name::new("Console"), Group, SpatialBundle::default()));
 
     let window = window.single();
@@ -133,11 +138,19 @@ fn setup_console(
     });
 }
 
-fn needs_update(console: Res<Console>) -> bool {
+fn needs_update<A>(console: Res<Console<A>>) -> bool
+where
+    A: Send + Sync + 'static,
+{
     console.needs_update
 }
 
-fn update_text(mut console: ResMut<Console>, mut text_query: Query<&mut Text, With<InputText>>) {
+fn update_text<A>(
+    mut console: ResMut<Console<A>>,
+    mut text_query: Query<&mut Text, With<InputText>>,
+) where
+    A: Send + Sync + 'static,
+{
     console.needs_update = false;
     let mut text = text_query.single_mut();
     text.sections[0].value = console.text.clone();
@@ -146,11 +159,13 @@ fn update_text(mut console: ResMut<Console>, mut text_query: Query<&mut Text, Wi
 #[derive(Event, Debug)]
 struct SubmittedText(String);
 
-fn get_keyboard_input(
-    mut console: ResMut<Console>,
+fn get_keyboard_input<A>(
+    mut console: ResMut<Console<A>>,
     mut key_events: EventReader<ReceivedCharacter>,
     mut submitted_text_writer: EventWriter<SubmittedText>,
-) {
+) where
+    A: Send + Sync + 'static,
+{
     for key in key_events.read() {
         info!("Key: {key:?}");
 
@@ -169,37 +184,32 @@ fn get_keyboard_input(
     }
 }
 
-fn handle_submitted_text(
+fn handle_submitted_text<A>(
     mut commands: Commands,
-    mut console: ResMut<Console>,
+    mut console: ResMut<Console<A>>,
     mut submitted_text_reader: EventReader<SubmittedText>,
-    mut action_writer: EventWriter<Box<dyn Action + Send + Sync>>,
-) {
+    mut actions_writer: EventWriter<A>,
+) where
+    A: ActionsImpl + Event + Debug + Send + Sync + 'static,
+{
     for text in submitted_text_reader.read() {
-        let Some(parts) = shlex::split(&text.0) else {
-            error!("Could not parse text: {text:?}");
-            continue;
-        };
-        let name = &parts[0];
-        let args = &parts[1..];
+        // let Some(parts) = shlex::split(&text.0) else {
+        //     error!("Could not parse text: {text:?}");
+        //     continue;
+        // };
+        // let name = &parts[0];
+        // let args = &parts[1..];
 
-        // for action in &mut console.actions {
-        //     if action.name() != name {
-        //         continue;
-        //     }
-        //
-        //     if let Err(e) = action.parse(args) {
-        //         error!("Could not parse args: {e:?}");
-        //         return;
-        //     }
-        //
-        //     action_writer.send(action);
-        //
-        //     return;
-        // }
+        let r = A::resolve(&text.0);
 
-        commands.run_system(oneshot);
-
-        error!("Could not find action: {name:?}");
+        match r {
+            Ok(action) => {
+                info!("yay Action: {:?}", action);
+                actions_writer.send(action);
+            }
+            Err(e) => {
+                error!("Error: {:?}", e);
+            }
+        }
     }
 }
