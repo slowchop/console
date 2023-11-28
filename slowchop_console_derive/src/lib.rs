@@ -34,22 +34,20 @@ impl Action {
                             let segment = path.segments.last().unwrap();
                             let ident = &segment.ident;
 
-                            match ident.to_string().as_str() {
-                                "String" => OrderedArgument::none(ArgumentType::String),
-                                "f32" | "f64" => OrderedArgument::none(ArgumentType::Float),
-                                "usize" | "isize" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32"
-                                | "u64" | "i64" | "u128" | "i128" => {
-                                    OrderedArgument::none(ArgumentType::Integer)
+                            if let Some(argument_type) = ArgumentType::from_ident(ident) {
+                                OrderedArgument::none(argument_type)
+                            } else {
+                                match ident.to_string().as_str() {
+                                    "Option" => OrderedArgument {
+                                        wrap_type: WrapType::Option,
+                                        argument_type: ArgumentType::from_inner(segment, "Option"),
+                                    },
+                                    "Vec" => OrderedArgument {
+                                        wrap_type: WrapType::Vec,
+                                        argument_type: ArgumentType::from_inner(segment, "Vec"),
+                                    },
+                                    _ => panic!("Unknown path type: {:?}", ident),
                                 }
-                                "Option" => OrderedArgument {
-                                    wrap_type: WrapType::Option,
-                                    argument_type: ArgumentType::from_inner(segment, "Option"),
-                                },
-                                "Vec" => OrderedArgument {
-                                    wrap_type: WrapType::Vec,
-                                    argument_type: ArgumentType::from_inner(segment, "Vec"),
-                                },
-                                _ => panic!("Unknown path type: {:?}", ident),
                             }
                         }
                         _ => panic!("Unknown argument_type: {:?}", field.ty),
@@ -106,7 +104,7 @@ enum ArgumentType {
     // Char,
     String,
     Integer,
-    // Bool,
+    Bool,
     Float,
 }
 
@@ -117,6 +115,7 @@ impl ArgumentType {
             "f32" | "f64" => Some(ArgumentType::Float),
             "usize" | "isize" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" | "i64"
             | "u128" | "i128" => Some(ArgumentType::Integer),
+            "bool" => Some(ArgumentType::Bool),
             _ => None,
         }
     }
@@ -230,6 +229,14 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                         }).transpose()?
                                     }
                                 }
+                                ArgumentType::Bool => {
+                                    quote! {
+                                        iter_args.next().map(|v| {
+                                            ::slowchop_console::parse_bool(v)
+                                                .ok_or(::slowchop_console::Error::ParseBoolError(#name_str.to_string()))
+                                        }).transpose()?
+                                    }
+                                }
                             }
 
                         }
@@ -256,6 +263,14 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                     quote! {
                                         iter_args
                                             .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
+                                            .collect::<Result<Vec<_>, _>>()?
+                                    }
+                                }
+                                ArgumentType::Bool => {
+                                    quote! {
+                                        iter_args
+                                            .map(|s| ::slowchop_console::parse_bool(s)
+                                                .ok_or(::slowchop_console::Error::ParseBoolError(#name_str.to_string())))
                                             .collect::<Result<Vec<_>, _>>()?
                                     }
                                 }
@@ -361,6 +376,19 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                     })?
                     .parse()
                     .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
+            }
+        }
+        // Bool is a bit different where we can't use parse.
+        // It needs to check for 1, t, true, y, yes, 0, f, false, n, no.
+        ArgumentType::Bool => {
+            quote! {
+                ::slowchop_console::parse_bool(
+                    iter_args
+                        .next()
+                        .ok_or(::slowchop_console::Error::NotEnoughArguments {
+                            action: #name_str.to_string()
+                        })?
+                ).ok_or(::slowchop_console::Error::ParseBoolError(#name_str.to_string()))?
             }
         }
     }

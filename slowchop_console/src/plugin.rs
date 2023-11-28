@@ -39,7 +39,14 @@ pub struct Console<A> {
     /// 1.0 for expanding all the way down to the bottom. 0.5 for half way.
     pub expand_fraction: f32,
 
-    needs_update: bool,
+    /// When the console changed from open to closed or vice versa.
+    ///
+    /// Triggers a visibility check.
+    console_did_toggle: bool,
+
+    /// When the input text changed.
+    input_did_update: bool,
+
     entity_entries: VecDeque<EntityEntry>,
     queued_entries: Arc<Mutex<Vec<Entry>>>,
     phantom_data: std::marker::PhantomData<A>,
@@ -51,7 +58,7 @@ impl<A> Console<A> {
             input: "".to_string(),
             toggle_key_code: Some(KeyCode::Grave),
             close_key_code: Some(KeyCode::Escape),
-            open_key_code: Some(KeyCode::T),
+            open_key_code: None,
             queued_entries,
             entity_entries: Default::default(),
             max_lines: 100,
@@ -59,9 +66,25 @@ impl<A> Console<A> {
             open: false,
             did_close_this_frame: false,
             expand_fraction: 0.5,
-            needs_update: true,
+            input_did_update: true,
+            console_did_toggle: true,
             phantom_data: Default::default(),
         }
+    }
+
+    pub fn open(&mut self) {
+        self.open = true;
+        self.console_did_toggle = true;
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
+        self.console_did_toggle = true;
+    }
+
+    pub fn toggle(&mut self) {
+        self.open = !self.open;
+        self.console_did_toggle = true;
     }
 }
 
@@ -112,6 +135,7 @@ where
                     open_shortcuts::<A>.run_if(|console: Res<Console<A>>| {
                         !console.open && !console.did_close_this_frame
                     }),
+                    update_visibility::<A>,
                 )
                     .chain(),
             ),
@@ -207,7 +231,7 @@ fn needs_update<A>(console: Res<Console<A>>) -> bool
 where
     A: Send + Sync + 'static,
 {
-    console.needs_update
+    console.input_did_update
 }
 
 fn update_input_text<A>(
@@ -216,7 +240,7 @@ fn update_input_text<A>(
 ) where
     A: Send + Sync + 'static,
 {
-    console.needs_update = false;
+    console.input_did_update = false;
     let mut text = text_query.single_mut();
     text.sections[0].value = console.input.clone();
 }
@@ -308,7 +332,7 @@ fn get_keyboard_input<A>(
             console.input.push(key.char);
         }
 
-        console.needs_update = true;
+        console.input_did_update = true;
     }
 }
 
@@ -320,11 +344,8 @@ where
 }
 
 /// Run this before handling keyboard to close the console if it is open.
-fn close_shortcuts<A>(
-    mut console: ResMut<Console<A>>,
-    keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<&mut Visibility, With<Root>>,
-) where
+fn close_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<Input<KeyCode>>)
+where
     A: Send + Sync + 'static,
 {
     let mut to_close = false;
@@ -342,18 +363,14 @@ fn close_shortcuts<A>(
     }
 
     if to_close {
-        *query.single_mut() = Visibility::Hidden;
-        console.open = false;
+        console.close();
         console.did_close_this_frame = true;
     }
 }
 
 /// Run this after handling keyboard to open the console if it is closed.
-fn open_shortcuts<A>(
-    mut console: ResMut<Console<A>>,
-    keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<&mut Visibility, With<Root>>,
-) where
+fn open_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<Input<KeyCode>>)
+where
     A: Send + Sync + 'static,
 {
     let mut to_open = false;
@@ -371,8 +388,23 @@ fn open_shortcuts<A>(
     }
 
     if to_open {
-        *query.single_mut() = Visibility::Visible;
-        console.open = true;
+        console.open();
+    }
+}
+
+fn update_visibility<A>(
+    mut console: ResMut<Console<A>>,
+    mut query: Query<&mut Visibility, With<Root>>,
+) where
+    A: Send + Sync + 'static,
+{
+    if console.console_did_toggle {
+        if console.open {
+            *query.single_mut() = Visibility::Visible;
+        } else {
+            *query.single_mut() = Visibility::Hidden;
+        }
+        console.console_did_toggle = false;
     }
 }
 

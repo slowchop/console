@@ -153,6 +153,25 @@ fn resolve_int_types() -> Result<(), Error> {
 }
 
 #[test]
+fn resolve_bool() -> Result<(), Error> {
+    assert_eq!(Con::resolve("Bool t")?, Con::Bool(true));
+    assert_eq!(Con::resolve("Bool true")?, Con::Bool(true));
+    assert_eq!(Con::resolve("Bool True")?, Con::Bool(true));
+    assert_eq!(Con::resolve("Bool y")?, Con::Bool(true));
+    assert_eq!(Con::resolve("Bool yes")?, Con::Bool(true));
+    assert_eq!(Con::resolve("Bool 1")?, Con::Bool(true));
+
+    assert_eq!(Con::resolve("Bool f")?, Con::Bool(false));
+    assert_eq!(Con::resolve("Bool false")?, Con::Bool(false));
+    assert_eq!(Con::resolve("Bool FALSE")?, Con::Bool(false));
+    assert_eq!(Con::resolve("Bool n")?, Con::Bool(false));
+    assert_eq!(Con::resolve("Bool no")?, Con::Bool(false));
+    assert_eq!(Con::resolve("Bool 0")?, Con::Bool(false));
+
+    Ok(())
+}
+
+#[test]
 fn vec() -> Result<(), Error> {
     assert_eq!(
         Con::resolve("VecString a b 'c c'")?,
@@ -250,6 +269,7 @@ enum Con {
         u128,
         i128,
     ),
+    Bool(bool),
     VecString(Vec<String>),
     VecFloat32(Vec<f32>),
     VecISize(Vec<isize>),

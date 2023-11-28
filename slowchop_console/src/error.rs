@@ -18,6 +18,9 @@ pub enum Error {
     #[error("Parse int error: {0} {1}")]
     ParseIntError(String, #[source] std::num::ParseIntError),
 
+    #[error("Parse bool error: {0}")]
+    ParseBoolError(String),
+
     #[error("Bad argument at position:{0} {1}")]
     BadArgument(usize, String),
 }
