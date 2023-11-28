@@ -11,4 +11,5 @@ readme:
 	    -o ../README.md
 
 release: readme test
-    cargo publish
+    cargo publish -p slowchop_console_derive
+    cargo publish -p slowchop_console
