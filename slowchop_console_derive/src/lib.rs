@@ -44,6 +44,14 @@ impl Action {
                                     wrap_type: WrapType::None,
                                     argument_type: ArgumentType::Float32,
                                 },
+                                "f64" => OrderedArgument {
+                                    wrap_type: WrapType::None,
+                                    argument_type: ArgumentType::Float64,
+                                },
+                                "usize" => OrderedArgument {
+                                    wrap_type: WrapType::None,
+                                    argument_type: ArgumentType::USize,
+                                },
                                 "isize" => OrderedArgument {
                                     wrap_type: WrapType::None,
                                     argument_type: ArgumentType::ISize,
@@ -71,7 +79,9 @@ impl Action {
                                     let argument_type = match ident.to_string().as_str() {
                                         "String" => ArgumentType::String,
                                         "f32" => ArgumentType::Float32,
+                                        "f64" => ArgumentType::Float64,
                                         "isize" => ArgumentType::ISize,
+                                        "usize" => ArgumentType::USize,
                                         _ => panic!("Unknown path type inside option: {:?}", ident),
                                     };
 
@@ -159,8 +169,22 @@ enum WrapType {
 #[derive(Debug)]
 enum ArgumentType {
     String,
-    Float32,
+    USize,
     ISize,
+    // Bool,
+    // Char,
+    // U8,
+    // I8,
+    // U16,
+    // I16,
+    // U32,
+    // I32,
+    // U64,
+    // I64,
+    // U128,
+    // I128,
+    Float32,
+    Float64,
 }
 
 fn actions(ast: &DeriveInput) -> TokenStream {
@@ -236,17 +260,17 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                         }
                                     }
                                 }
-                                ArgumentType::Float32 => {
-                                    quote! {
-                                        iter_args.next().map(|v| {
-                                            v.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))
-                                        }).transpose()?
-                                    }
-                                }
-                                ArgumentType::ISize => {
+                                ArgumentType::USize | ArgumentType::ISize => {
                                     quote! {
                                         iter_args.next().map(|v| {
                                             v.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))
+                                        }).transpose()?
+                                    }
+                                }
+                                ArgumentType::Float32 | ArgumentType::Float64 => {
+                                    quote! {
+                                        iter_args.next().map(|v| {
+                                            v.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))
                                         }).transpose()?
                                     }
                                 }
@@ -265,17 +289,17 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                         iter_args.map(|s| s.to_string()).collect::<Vec<_>>()
                                     }
                                 }
-                                ArgumentType::Float32 => {
-                                    quote! {
-                                        iter_args
-                                            .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
-                                            .collect::<Result<Vec<_>, _>>()?
-                                    }
-                                }
-                                ArgumentType::ISize => {
+                                ArgumentType::USize | ArgumentType::ISize => {
                                     quote! {
                                         iter_args
                                             .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err)))
+                                            .collect::<Result<Vec<_>, _>>()?
+                                    }
+                                }
+                                ArgumentType::Float32 | ArgumentType::Float64 => {
+                                    quote! {
+                                        iter_args
+                                            .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
                                             .collect::<Result<Vec<_>, _>>()?
                                     }
                                 }
@@ -355,13 +379,24 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                 }
             } else {
                 quote! {
-                    iter_args.next().ok_or(::slowchop_console::Error::NotEnoughArguments{
+                    iter_args.next().ok_or(::slowchop_console::Error::NotEnoughArguments {
                         action: #name_str.to_string(),
                     })?.to_string()
                 }
             }
         }
-        ArgumentType::Float32 => {
+        ArgumentType::USize | ArgumentType::ISize => {
+            quote! {
+                iter_args
+                    .next()
+                    .ok_or(::slowchop_console::Error::NotEnoughArguments{
+                        action: #name_str.to_string()
+                    })?
+                    .parse()
+                    .map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))?
+            }
+        }
+        ArgumentType::Float32 | ArgumentType::Float64 => {
             quote! {
                 iter_args
                     .next()
@@ -370,17 +405,6 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                     })?
                     .parse()
                     .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
-            }
-        }
-        ArgumentType::ISize => {
-            quote! {
-                iter_args
-                    .next()
-                    .ok_or(::slowchop_console::Error::NotEnoughArguments {
-                        action: #name_str.to_string()
-                    })?
-                    .parse()
-                    .map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))?
             }
         }
     }

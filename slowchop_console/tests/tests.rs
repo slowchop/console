@@ -1,4 +1,4 @@
-use slowchop_console::{Actions, Error};
+use slowchop_console::{Actions, ActionsImpl, Error};
 
 // // TODO: #[derive(Actions)]
 // enum Console {
@@ -143,6 +143,16 @@ fn resolve_two_floats() -> Result<(), Error> {
 }
 
 #[test]
+fn resolve_int_types() -> Result<(), Error> {
+    assert_eq!(
+        Con::resolve("DifferentIntTypes 1 2")?,
+        Con::DifferentIntTypes(1, 2)
+    );
+
+    Ok(())
+}
+
+#[test]
 fn vec() -> Result<(), Error> {
     assert_eq!(
         Con::resolve("VecString a b 'c c'")?,
@@ -225,7 +235,8 @@ enum Con {
     Quit,
     Echo(String),
     TwoStrings(String, String),
-    TwoFloats(f32, f32),
+    TwoFloats(f32, f64),
+    DifferentIntTypes(isize, usize),
     VecString(Vec<String>),
     VecFloat32(Vec<f32>),
     VecISize(Vec<isize>),
