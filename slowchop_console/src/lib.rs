@@ -1,4 +1,4 @@
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 #![deny(unsafe_code)]
 #![warn(future_incompatible)]
 #![warn(missing_debug_implementations)]
@@ -48,7 +48,7 @@ pub use plugin::{Console, ConsolePlugin};
 pub use slowchop_console_derive::Actions;
 
 /// The trait that is derived by the `Actions` derive macro.
-pub trait ActionsImpl {
+pub trait ActionsHandler {
     fn resolve(text: &str) -> Result<Self, Error>
     where
         Self: Sized;

@@ -12,10 +12,15 @@ enum MyGameActions {
     Spawn(f32),
     Quit(bool),
 
+    /// Demonstrates how trace messages are displayed.
     Trace,
+    /// Demonstrates how debug messages are displayed.
     Debug,
+    /// Demonstrates how info messages are displayed.
     Info,
+    /// Demonstrates how warn messages are displayed.
     Warn,
+    /// Demonstrates how error messages are displayed.
     Error,
 }
 

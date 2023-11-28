@@ -314,11 +314,11 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     });
 
     quote! {
-        impl ::slowchop_console::ActionsImpl for #name {
+        impl ::slowchop_console::ActionsHandler for #name {
             fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
                 let items = shlex::split(s).unwrap();
                 if items.len() == 0 {
-                    return Err(::slowchop_console::Error::NoCommandGiven);
+                    return Err(::slowchop_console::Error::NoActionGiven);
                 }
 
                 let user_action = &items[0];
@@ -375,8 +375,6 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                     .map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))?
             }
         }
-        // Bool is a bit different where we can't use parse.
-        // It needs to check for 1, t, true, y, yes, 0, f, false, n, no.
         ArgumentType::Bool => {
             quote! {
                 ::slowchop_console::parse_bool(

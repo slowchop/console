@@ -1,7 +1,7 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("No action given")]
-    NoCommandGiven,
+    NoActionGiven,
 
     #[error("Unknown action: {action}")]
     UnknownAction { action: String },

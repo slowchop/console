@@ -1,11 +1,10 @@
-use crate::ActionsImpl;
+use crate::ActionsHandler;
 use bevy::log::Level;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 /// A container for entries that are queued up to be added to the console.
 ///
@@ -16,12 +15,12 @@ pub struct QueuedEntries(pub(crate) Arc<Mutex<Vec<Entry>>>);
 #[derive(Debug)]
 struct EntityEntry {
     entity: Entity,
-    entry: Entry,
+    // entry: Entry,
 }
 
 #[derive(Debug)]
 pub(crate) struct Entry {
-    pub(crate) when: Instant,
+    // pub(crate) when: Instant, // TODO: Use this to show the time of the entry, or fade out old entries.
     pub(crate) level: Level,
     pub(crate) message: String,
 }
@@ -120,7 +119,7 @@ where
 
 impl<A> Plugin for ConsolePlugin<A>
 where
-    A: ActionsImpl + Debug + Event + Send + Sync + 'static,
+    A: ActionsHandler + Debug + Event + Send + Sync + 'static,
 {
     fn build(&self, app: &mut App) {
         app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
@@ -307,9 +306,7 @@ fn update_history<A>(
 
         commands.entity(history).push_children(&[entity]);
 
-        console
-            .entity_entries
-            .push_back(EntityEntry { entity, entry });
+        console.entity_entries.push_back(EntityEntry { entity });
     }
 
     // Check for older items that need to be removed from the history node. Remove them from the
@@ -421,7 +418,7 @@ fn handle_submitted_text<A>(
     mut submitted_text_reader: EventReader<SubmittedText>,
     mut actions_writer: EventWriter<A>,
 ) where
-    A: ActionsImpl + Event + Debug + Send + Sync + 'static,
+    A: ActionsHandler + Event + Debug + Send + Sync + 'static,
 {
     for text in submitted_text_reader.read() {
         info!("> {}", &**text);
