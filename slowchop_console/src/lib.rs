@@ -1,6 +1,7 @@
 #![deny(missing_docs)]
-#![allow(clippy::missing_errors_doc)]
-#![allow(clippy::missing_panics_doc)]
+#![deny(unsafe_code)]
+#![deny(future_incompatible)]
+#![warn(missing_debug_implementations)]
 
 mod error;
 mod plugin;

@@ -152,7 +152,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
         }
     };
 
-    let actions: Vec<Action> = variants.iter().map(|v| Action::from_variant(v)).collect();
+    let actions: Vec<Action> = variants.iter().map(Action::from_variant).collect();
 
     // TODO: Make sure there are no options after required arguments.
     // TODO: Make sure Vec is only the last argument.
@@ -193,7 +193,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                             if has_seen_option {
                                 panic!("Required arguments must come before optional arguments: {:?}", ordered_args);
                             }
-                            parse_argument_type(argument_type, is_last, &name_str)
+                            parse_argument_type(argument_type, is_last, name_str)
                         }
                         WrapType::Option => {
                             has_seen_option = true;
@@ -313,9 +313,8 @@ fn actions(ast: &DeriveInput) -> TokenStream {
         }
     });
 
-    let gen = quote! {
+    quote! {
         impl ::slowchop_console::ActionsImpl for #name {
-            /// Resolve the given string into a command.
             fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
                 let items = shlex::split(s).unwrap();
                 if items.len() == 0 {
@@ -335,9 +334,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
 
             }
         }
-    };
-
-    gen.into()
+    }
 }
 
 fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &str) -> TokenStream {

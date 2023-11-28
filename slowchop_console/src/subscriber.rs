@@ -25,7 +25,7 @@ where
             message: visitor.0,
         };
 
-        let mut lines = self.queued_entries.lock().unwrap();
+        let mut lines = self.queued_entries.0.lock().unwrap();
         lines.push(entry);
     }
 }

@@ -20,7 +20,7 @@ enum MyGameActions {
 }
 
 pub fn main() {
-    let console_plugin = ConsolePlugin::<MyGameActions>::new();
+    let console_plugin = ConsolePlugin::<MyGameActions>::default();
 
     let default_filter = "trace,wgpu=error,naga=warn,bevy=info,winit=info,gilrs=info".to_string();
     let filter_layer = EnvFilter::try_from_default_env()

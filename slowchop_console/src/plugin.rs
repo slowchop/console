@@ -7,20 +7,28 @@ use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-pub struct EntityEntry {
-    pub entity: Entity,
-    pub entry: Entry,
+/// A container for entries that are queued up to be added to the console.
+///
+/// This was created specifically to use with the tracing subscriber.
+#[derive(Debug, Clone, Default)]
+pub struct QueuedEntries(pub(crate) Arc<Mutex<Vec<Entry>>>);
+
+#[derive(Debug)]
+struct EntityEntry {
+    entity: Entity,
+    entry: Entry,
 }
 
-pub struct Entry {
-    pub when: Instant,
-    pub level: Level,
-    pub message: String,
+#[derive(Debug)]
+pub(crate) struct Entry {
+    pub(crate) when: Instant,
+    pub(crate) level: Level,
+    pub(crate) message: String,
 }
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 pub struct Console<A> {
-    pub input: String,
+    input: String,
 
     pub max_lines: usize,
 
@@ -32,6 +40,7 @@ pub struct Console<A> {
 
     /// The console is open if this is true.
     pub open: bool,
+
     /// To stop the toggle from opening and closing the console on the same frame.
     did_close_this_frame: bool,
 
@@ -48,12 +57,12 @@ pub struct Console<A> {
     input_did_update: bool,
 
     entity_entries: VecDeque<EntityEntry>,
-    queued_entries: Arc<Mutex<Vec<Entry>>>,
+    queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
 }
 
 impl<A> Console<A> {
-    pub fn with_lines(queued_entries: Arc<Mutex<Vec<Entry>>>) -> Self {
+    pub fn with_lines(queued_entries: QueuedEntries) -> Self {
         Console {
             input: "".to_string(),
             toggle_key_code: Some(KeyCode::Grave),
@@ -88,22 +97,22 @@ impl<A> Console<A> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
-    pub(crate) queued_entries: Arc<Mutex<Vec<Entry>>>,
+    pub(crate) queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
 }
 
-impl<A> ConsolePlugin<A>
+impl<A> Default for ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
-    pub fn new() -> Self {
-        ConsolePlugin {
-            queued_entries: Arc::new(Mutex::new(Vec::new())),
+    fn default() -> Self {
+        Self {
+            queued_entries: Default::default(),
             phantom_data: Default::default(),
         }
     }
@@ -254,7 +263,7 @@ fn update_history<A>(
 {
     // Mutex lock and remove all items from queued vec.
     let new_entries = {
-        let mut queued_entries = console.queued_entries.lock().unwrap();
+        let mut queued_entries = console.queued_entries.0.lock().unwrap();
         std::mem::take(&mut *queued_entries)
     };
 
