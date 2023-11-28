@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments};
+use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments, PathSegment};
 
 #[proc_macro_derive(Actions)]
 pub fn actions_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -41,74 +41,14 @@ impl Action {
                                 | "u64" | "i64" | "u128" | "i128" => {
                                     OrderedArgument::none(ArgumentType::Integer)
                                 }
-
-                                "Option" => {
-                                    // We just want to handle "String", "f32", etc within the Option.
-                                    let PathArguments::AngleBracketed(bracketed) =
-                                        &segment.arguments
-                                    else {
-                                        panic!(
-                                            "Expected angle bracketed arguments: {:?}",
-                                            segment.arguments
-                                        );
-                                    };
-                                    let arg = &bracketed.args[0];
-                                    let GenericArgument::Type(ty) = arg else {
-                                        panic!("Expected type: {:?}", arg);
-                                    };
-                                    let syn::Type::Path(path) = ty else {
-                                        panic!("Expected path: {:?}", ty);
-                                    };
-                                    let segment = path.path.segments.last().unwrap();
-                                    let ident = &segment.ident;
-
-                                    let argument_type = match ident.to_string().as_str() {
-                                        "String" => ArgumentType::String,
-                                        "f32" | "f64" => ArgumentType::Float,
-                                        "isize" | "usize" => ArgumentType::Integer,
-                                        _ => panic!("Unknown path type inside option: {:?}", ident),
-                                    };
-
-                                    OrderedArgument {
-                                        wrap_type: WrapType::Option,
-                                        argument_type,
-                                    }
-                                }
-                                "Vec" => {
-                                    // We just want to handle "String", "f32", etc within the Vec.
-                                    let PathArguments::AngleBracketed(bracketed) =
-                                        &segment.arguments
-                                    else {
-                                        panic!(
-                                            "Expected angle bracketed arguments: {:?}",
-                                            segment.arguments
-                                        );
-                                    };
-                                    let arg = &bracketed.args[0];
-                                    let GenericArgument::Type(ty) = arg else {
-                                        panic!("Expected type: {:?}", arg);
-                                    };
-                                    let syn::Type::Path(path) = ty else {
-                                        panic!("Expected path: {:?}", ty);
-                                    };
-                                    let segment = path.path.segments.last().unwrap();
-                                    let ident = &segment.ident;
-
-                                    let argument_type = match ident.to_string().as_str() {
-                                        "String" => ArgumentType::String,
-                                        "f32" | "f64" => ArgumentType::Float,
-                                        "usize" | "isize" | "u8" | "i8" | "u16" | "i16" | "u32"
-                                        | "i32" | "u64" | "i64" | "u128" | "i128" => {
-                                            ArgumentType::Integer
-                                        }
-                                        _ => panic!("Unknown path type inside vec: {:?}", ident),
-                                    };
-
-                                    OrderedArgument {
-                                        wrap_type: WrapType::Vec,
-                                        argument_type,
-                                    }
-                                }
+                                "Option" => OrderedArgument {
+                                    wrap_type: WrapType::Option,
+                                    argument_type: ArgumentType::from_inner(segment, "Option"),
+                                },
+                                "Vec" => OrderedArgument {
+                                    wrap_type: WrapType::Vec,
+                                    argument_type: ArgumentType::from_inner(segment, "Vec"),
+                                },
                                 _ => panic!("Unknown path type: {:?}", ident),
                             }
                         }
@@ -168,6 +108,39 @@ enum ArgumentType {
     Integer,
     // Bool,
     Float,
+}
+
+impl ArgumentType {
+    fn from_ident(ident: &syn::Ident) -> Option<Self> {
+        match ident.to_string().as_str() {
+            "String" => Some(ArgumentType::String),
+            "f32" | "f64" => Some(ArgumentType::Float),
+            "usize" | "isize" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" | "i64"
+            | "u128" | "i128" => Some(ArgumentType::Integer),
+            _ => None,
+        }
+    }
+
+    fn from_inner(segment: &PathSegment, section: &str) -> Self {
+        let PathArguments::AngleBracketed(bracketed) = &segment.arguments else {
+            panic!(
+                "Expected angle bracketed arguments in {section}: {:?}",
+                segment.arguments
+            );
+        };
+        let arg = &bracketed.args[0];
+        let GenericArgument::Type(ty) = arg else {
+            panic!("Expected type in {section}: {arg:?}");
+        };
+        let syn::Type::Path(path) = ty else {
+            panic!("Expected path in {section}: {ty:?}");
+        };
+        let segment = path.path.segments.last().unwrap();
+        let ident = &segment.ident;
+
+        ArgumentType::from_ident(ident)
+            .unwrap_or_else(|| panic!("Unknown path type in {section}: {ident:?}"))
+    }
 }
 
 fn actions(ast: &DeriveInput) -> TokenStream {
