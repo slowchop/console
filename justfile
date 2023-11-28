@@ -10,3 +10,5 @@ readme:
 	    --no-indent-headings \
 	    -o ../README.md
 
+release: readme test
+    cargo publish
