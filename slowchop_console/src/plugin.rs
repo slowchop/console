@@ -32,6 +32,8 @@ pub struct Console<A> {
 
     /// The console is open if this is true.
     pub open: bool,
+    /// To stop the toggle from opening and closing the console on the same frame.
+    did_close_this_frame: bool,
 
     /// How far down the console will expand to, as a percentage of the screen height.
     /// 1.0 for expanding all the way down to the bottom. 0.5 for half way.
@@ -55,6 +57,7 @@ impl<A> Console<A> {
             max_lines: 100,
             font_size: 20.0,
             open: false,
+            did_close_this_frame: false,
             expand_fraction: 0.5,
             needs_update: true,
             phantom_data: Default::default(),
@@ -96,14 +99,21 @@ where
             Update,
             (
                 update_history::<A>,
-                toggle_shortcuts::<A>.after(get_keyboard_input::<A>),
                 (
-                    get_keyboard_input::<A>,
-                    update_input_text::<A>.run_if(needs_update::<A>),
-                    handle_submitted_text::<A>,
+                    reset_did_close_flag::<A>,
+                    close_shortcuts::<A>.run_if(|console: Res<Console<A>>| console.open),
+                    (
+                        get_keyboard_input::<A>,
+                        update_input_text::<A>.run_if(needs_update::<A>),
+                        handle_submitted_text::<A>,
+                    )
+                        .chain()
+                        .run_if(|console: Res<Console<A>>| console.open),
+                    open_shortcuts::<A>.run_if(|console: Res<Console<A>>| {
+                        !console.open && !console.did_close_this_frame
+                    }),
                 )
-                    .chain()
-                    .run_if(|console: Res<Console<A>>| console.open),
+                    .chain(),
             ),
         );
     }
@@ -303,45 +313,69 @@ fn get_keyboard_input<A>(
     }
 }
 
-fn toggle_shortcuts<A>(
+fn reset_did_close_flag<A>(mut console: ResMut<Console<A>>)
+where
+    A: Send + Sync + 'static,
+{
+    console.did_close_this_frame = false;
+}
+
+/// Run this before handling keyboard to close the console if it is open.
+fn close_shortcuts<A>(
     mut console: ResMut<Console<A>>,
     keyboard_input: Res<Input<KeyCode>>,
     mut query: Query<&mut Visibility, With<Root>>,
 ) where
     A: Send + Sync + 'static,
 {
-    let mut changed = false;
+    let mut to_close = false;
 
     if let Some(key_code) = console.toggle_key_code {
         if keyboard_input.just_pressed(key_code) {
-            console.open = !console.open;
-            changed = true;
+            to_close = true;
         }
     }
 
-    if console.open {
-        if let Some(key_code) = console.close_key_code {
-            if keyboard_input.just_pressed(key_code) {
-                console.open = false;
-                changed = true;
-            }
-        }
-    } else {
-        if let Some(key_code) = console.open_key_code {
-            if keyboard_input.just_pressed(key_code) {
-                console.open = true;
-                changed = true;
-            }
+    if let Some(key_code) = console.close_key_code {
+        if keyboard_input.just_pressed(key_code) {
+            to_close = true;
         }
     }
 
-    if changed {
-        let mut visibility = query.single_mut();
-        *visibility = if console.open {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+    if to_close {
+        info!("Closing console.");
+        *query.single_mut() = Visibility::Hidden;
+        console.open = false;
+        console.did_close_this_frame = true;
+    }
+}
+
+/// Run this after handling keyboard to open the console if it is closed.
+fn open_shortcuts<A>(
+    mut console: ResMut<Console<A>>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut query: Query<&mut Visibility, With<Root>>,
+) where
+    A: Send + Sync + 'static,
+{
+    let mut to_open = false;
+
+    if let Some(key_code) = console.toggle_key_code {
+        if keyboard_input.just_pressed(key_code) {
+            to_open = true;
+        }
+    }
+
+    if let Some(key_code) = console.open_key_code {
+        if keyboard_input.just_pressed(key_code) {
+            to_open = true;
+        }
+    }
+
+    if to_open {
+        info!("Opening console.");
+        *query.single_mut() = Visibility::Visible;
+        console.open = true;
     }
 }
 
