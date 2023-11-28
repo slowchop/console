@@ -2669,7 +2669,7 @@ dependencies = [
 
 [[package]]
 name = "slowchop_console"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bevy",
  "bevy-inspector-egui",
@@ -2681,7 +2681,7 @@ dependencies = [
 
 [[package]]
 name = "slowchop_console_derive"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
