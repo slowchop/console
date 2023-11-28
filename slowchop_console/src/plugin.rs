@@ -22,9 +22,11 @@ pub struct Entry {
 pub struct Console<A> {
     pub input: String,
 
-    entity_entries: VecDeque<EntityEntry>,
-    queued_entries: Arc<Mutex<Vec<Entry>>>,
     pub max_lines: usize,
+
+    pub toggle_key_code: Option<KeyCode>,
+    pub open_key_code: Option<KeyCode>,
+    pub close_key_code: Option<KeyCode>,
 
     pub font_size: f32,
 
@@ -36,7 +38,8 @@ pub struct Console<A> {
     pub expand_fraction: f32,
 
     needs_update: bool,
-
+    entity_entries: VecDeque<EntityEntry>,
+    queued_entries: Arc<Mutex<Vec<Entry>>>,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -44,6 +47,9 @@ impl<A> Console<A> {
     pub fn with_lines(queued_entries: Arc<Mutex<Vec<Entry>>>) -> Self {
         Console {
             input: "".to_string(),
+            toggle_key_code: Some(KeyCode::Grave),
+            close_key_code: Some(KeyCode::Escape),
+            open_key_code: Some(KeyCode::T),
             queued_entries,
             entity_entries: Default::default(),
             max_lines: 100,
@@ -56,12 +62,6 @@ impl<A> Console<A> {
     }
 }
 
-/// The console is a text box that can be used to enter commands.
-/// It will draw a background rect (e.g. black or a texture).
-/// It will have an input field at the bottom, with a blinking cursor.
-/// It will draw text starting from above the input, and scrolling up.
-/// The user can toggle the console with a key (e.g. tilde), but they control how that's done maybe
-/// via an event.
 #[derive(Clone)]
 pub struct ConsolePlugin<A>
 where
@@ -96,19 +96,21 @@ where
             Update,
             (
                 update_history::<A>,
+                toggle_shortcuts::<A>.after(get_keyboard_input::<A>),
                 (
                     get_keyboard_input::<A>,
                     update_input_text::<A>.run_if(needs_update::<A>),
                     handle_submitted_text::<A>,
                 )
-                    .chain(),
+                    .chain()
+                    .run_if(|console: Res<Console<A>>| console.open),
             ),
         );
     }
 }
 
 #[derive(Component)]
-struct Group;
+struct Root;
 
 #[derive(Component)]
 struct Background;
@@ -130,8 +132,9 @@ fn setup_console<A>(
 
     let mut group = commands.spawn((
         Name::new("Console"),
-        Group,
+        Root,
         NodeBundle {
+            visibility: Visibility::Hidden,
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Px(
@@ -142,7 +145,8 @@ fn setup_console<A>(
                 flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
-            background_color: Color::PURPLE.into(),
+            // background_color: Color::PURPLE.into(),
+            background_color: Color::INDIGO.into(),
             ..default()
         },
     ));
@@ -155,6 +159,7 @@ fn setup_console<A>(
                 style: Style {
                     flex_grow: 0.,
                     min_height: Val::Px(console.font_size),
+                    margin: UiRect::all(Val::Px(5.)),
                     ..default()
                 },
                 background_color: Color::BLACK.into(),
@@ -175,7 +180,7 @@ fn setup_console<A>(
             Name::new("History"),
             History,
             NodeBundle {
-                background_color: Color::INDIGO.into(),
+                // background_color: Color::INDIGO.into(),
                 style: Style {
                     overflow: Overflow::clip_y(),
                     flex_direction: FlexDirection::Column,
@@ -229,11 +234,11 @@ fn update_history<A>(
     // history node.
     for entry in new_entries {
         let color = match entry.level {
-            Level::TRACE => Color::WHITE,
-            Level::DEBUG => Color::GRAY,
+            Level::TRACE => Color::GRAY,
+            Level::DEBUG => Color::WHITE,
             Level::INFO => Color::LIME_GREEN,
             Level::WARN => Color::YELLOW,
-            Level::ERROR => Color::RED,
+            Level::ERROR => Color::ORANGE_RED,
         };
 
         let entity = commands
@@ -248,6 +253,10 @@ fn update_history<A>(
                             ..default()
                         },
                     ),
+                    style: Style {
+                        margin: UiRect::all(Val::Px(5.)),
+                        ..default()
+                    },
                     ..default()
                 },
             ))
@@ -269,12 +278,13 @@ fn update_history<A>(
     }
 }
 
-#[derive(Event, Debug)]
+#[derive(Event, Debug, Deref)]
 struct SubmittedText(String);
 
 fn get_keyboard_input<A>(
     mut console: ResMut<Console<A>>,
     mut key_events: EventReader<ReceivedCharacter>,
+    keyboard_input: Res<Input<KeyCode>>,
     mut submitted_text_writer: EventWriter<SubmittedText>,
 ) where
     A: Send + Sync + 'static,
@@ -293,6 +303,48 @@ fn get_keyboard_input<A>(
     }
 }
 
+fn toggle_shortcuts<A>(
+    mut console: ResMut<Console<A>>,
+    keyboard_input: Res<Input<KeyCode>>,
+    mut query: Query<&mut Visibility, With<Root>>,
+) where
+    A: Send + Sync + 'static,
+{
+    let mut changed = false;
+
+    if let Some(key_code) = console.toggle_key_code {
+        if keyboard_input.just_pressed(key_code) {
+            console.open = !console.open;
+            changed = true;
+        }
+    }
+
+    if console.open {
+        if let Some(key_code) = console.close_key_code {
+            if keyboard_input.just_pressed(key_code) {
+                console.open = false;
+                changed = true;
+            }
+        }
+    } else {
+        if let Some(key_code) = console.open_key_code {
+            if keyboard_input.just_pressed(key_code) {
+                console.open = true;
+                changed = true;
+            }
+        }
+    }
+
+    if changed {
+        let mut visibility = query.single_mut();
+        *visibility = if console.open {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+}
+
 fn handle_submitted_text<A>(
     mut submitted_text_reader: EventReader<SubmittedText>,
     mut actions_writer: EventWriter<A>,
@@ -300,12 +352,13 @@ fn handle_submitted_text<A>(
     A: ActionsImpl + Event + Debug + Send + Sync + 'static,
 {
     for text in submitted_text_reader.read() {
+        info!("> {}", &**text);
         match A::resolve(&text.0) {
             Ok(action) => {
                 actions_writer.send(action);
             }
             Err(e) => {
-                error!("Error: {e:#?}");
+                error!("{e:#?}");
             }
         }
     }

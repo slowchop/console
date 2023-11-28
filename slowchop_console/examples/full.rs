@@ -9,9 +9,6 @@ use tracing_subscriber::EnvFilter;
 
 #[derive(Actions, Clone, Debug, Event)]
 enum MyGameActions {
-    Help(String),
-    List,
-    Color,
     Spawn(f32),
 
     Trace,
@@ -38,8 +35,8 @@ pub fn main() {
     App::new()
         .add_plugins((
             DefaultPlugins.build().disable::<LogPlugin>(),
-            WorldInspectorPlugin::new().run_if(input_toggle_active(false, KeyCode::F1)),
             console_plugin,
+            WorldInspectorPlugin::new().run_if(input_toggle_active(false, KeyCode::F1)),
         ))
         .add_systems(Startup, setup_camera)
         .add_systems(Update, handle_actions)
@@ -53,13 +50,10 @@ fn setup_camera(mut commands: Commands) {
 fn handle_actions(mut actions: EventReader<MyGameActions>) {
     for action in actions.read() {
         match action {
-            MyGameActions::Help(text) => info!("Help: {}", text),
-            MyGameActions::List => info!("List"),
-            MyGameActions::Color => info!("Color"),
-            MyGameActions::Spawn(count) => info!("Spawn: {}", count),
+            MyGameActions::Spawn(count) => info!("Spawning {} entities.", count),
             MyGameActions::Trace => trace!("Tracing 0xABCDEF 0xABCDEF 0xABCDEF"),
             MyGameActions::Debug => debug!("Debug 0xABCDEF"),
-            MyGameActions::Info => info!("Some lovely information "),
+            MyGameActions::Info => info!("Some lovely information."),
             MyGameActions::Warn => warn!("Hello, this is a warning."),
             MyGameActions::Error => error!("Error! Error! Error! This is an error message."),
         }
