@@ -294,7 +294,6 @@ struct SubmittedText(String);
 fn get_keyboard_input<A>(
     mut console: ResMut<Console<A>>,
     mut key_events: EventReader<ReceivedCharacter>,
-    keyboard_input: Res<Input<KeyCode>>,
     mut submitted_text_writer: EventWriter<SubmittedText>,
 ) where
     A: Send + Sync + 'static,
@@ -343,7 +342,6 @@ fn close_shortcuts<A>(
     }
 
     if to_close {
-        info!("Closing console.");
         *query.single_mut() = Visibility::Hidden;
         console.open = false;
         console.did_close_this_frame = true;
@@ -373,7 +371,6 @@ fn open_shortcuts<A>(
     }
 
     if to_open {
-        info!("Opening console.");
         *query.single_mut() = Visibility::Visible;
         console.open = true;
     }

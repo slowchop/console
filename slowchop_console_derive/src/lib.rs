@@ -8,9 +8,7 @@ use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments};
 #[proc_macro_derive(Actions)]
 pub fn actions_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-
     let output: TokenStream = actions(&input);
-
     proc_macro::TokenStream::from(output)
 }
 
@@ -191,8 +189,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                 });
             }
             ActionType::OrderedArgs(ordered_args) => {
-                // Before we can parse the arguments, we need to know how many there are.
-
                 let required_args = ordered_args.iter().filter(|arg| arg.wrap_type == WrapType::None).count();
                 let optional_args = ordered_args.iter().filter(|arg| arg.wrap_type == WrapType::Option).count();
                 let max_args = required_args + optional_args;
@@ -213,14 +209,10 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                             if has_seen_option {
                                 panic!("Required arguments must come before optional arguments: {:?}", ordered_args);
                             }
-                            eprintln!("- R E Q U I R E D -----argument type: {argument_type:#?}");
                             parse_argument_type(argument_type, is_last, &name_str)
                         }
                         WrapType::Option => {
                             has_seen_option = true;
-                            eprintln!("- O P T I O N -----argument type: {argument_type:#?}");
-                            // parse_argument_type(argument_type, true, is_last, &name_str)
-
                             match argument_type {
                                 ArgumentType::String => {
                                     if is_last {
@@ -261,8 +253,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                 panic!("Vec can only be the last argument: {:?}", ordered_args);
                             }
                             final_arg_consumes_everything = true;
-                            // parse_argument_type(argument_type, is_last, &name_str)
-                            // Iterate over the rest of the arguments, and parse them, depending on the type.
 
                             match argument_type {
                                 ArgumentType::String => {
@@ -289,8 +279,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                         }
                     };
 
-                    eprintln!("arg: {}", arg.to_string());
-
                     if let ArgumentType::String = argument_type {
                         if let WrapType::None = wrap_type {
                             if is_last {
@@ -305,11 +293,6 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                 tokens.push(quote! {
                     let given_args = iter_args.len();
 
-                    eprintln!("given_args: {}", given_args);
-                    eprintln!("required_args: {}", #required_args);
-                    eprintln!("optional_args: {}", #optional_args);
-                    eprintln!("max_args: {}", #max_args);
-
                     if !#final_arg_consumes_everything && given_args > #max_args {
                         return Err(::slowchop_console::Error::TooManyArguments(#name_str.to_string()));
                     }
@@ -321,19 +304,12 @@ fn actions(ast: &DeriveInput) -> TokenStream {
             }
         }
 
-        // eprintln!("tokens: {:#?}", tokens);
-        // for token in &tokens {
-        //     eprintln!("token: {}", token);
-        // }
-
         quote! {
             #name_str => {
                 #(#tokens)*
             }
         }
     });
-
-    eprintln!("resove_actions: {:#?}", resove_actions);
 
     let gen = quote! {
         impl ::slowchop_console::ActionsImpl for #name {
