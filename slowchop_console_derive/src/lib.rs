@@ -2,7 +2,6 @@ extern crate proc_macro;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::spanned::Spanned;
 use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments};
 
 #[proc_macro_derive(Actions)]
@@ -36,26 +35,13 @@ impl Action {
                             let ident = &segment.ident;
 
                             match ident.to_string().as_str() {
-                                "String" => OrderedArgument {
-                                    wrap_type: WrapType::None,
-                                    argument_type: ArgumentType::String,
-                                },
-                                "f32" => OrderedArgument {
-                                    wrap_type: WrapType::None,
-                                    argument_type: ArgumentType::Float32,
-                                },
-                                "f64" => OrderedArgument {
-                                    wrap_type: WrapType::None,
-                                    argument_type: ArgumentType::Float64,
-                                },
-                                "usize" => OrderedArgument {
-                                    wrap_type: WrapType::None,
-                                    argument_type: ArgumentType::USize,
-                                },
-                                "isize" => OrderedArgument {
-                                    wrap_type: WrapType::None,
-                                    argument_type: ArgumentType::ISize,
-                                },
+                                "String" => OrderedArgument::none(ArgumentType::String),
+                                "f32" | "f64" => OrderedArgument::none(ArgumentType::Float),
+                                "usize" | "isize" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32"
+                                | "u64" | "i64" | "u128" | "i128" => {
+                                    OrderedArgument::none(ArgumentType::Integer)
+                                }
+
                                 "Option" => {
                                     // We just want to handle "String", "f32", etc within the Option.
                                     let PathArguments::AngleBracketed(bracketed) =
@@ -78,10 +64,8 @@ impl Action {
 
                                     let argument_type = match ident.to_string().as_str() {
                                         "String" => ArgumentType::String,
-                                        "f32" => ArgumentType::Float32,
-                                        "f64" => ArgumentType::Float64,
-                                        "isize" => ArgumentType::ISize,
-                                        "usize" => ArgumentType::USize,
+                                        "f32" | "f64" => ArgumentType::Float,
+                                        "isize" | "usize" => ArgumentType::Integer,
                                         _ => panic!("Unknown path type inside option: {:?}", ident),
                                     };
 
@@ -112,9 +96,11 @@ impl Action {
 
                                     let argument_type = match ident.to_string().as_str() {
                                         "String" => ArgumentType::String,
-                                        "f32" => ArgumentType::Float32,
-                                        "isize" => ArgumentType::ISize,
-
+                                        "f32" | "f64" => ArgumentType::Float,
+                                        "usize" | "isize" | "u8" | "i8" | "u16" | "i16" | "u32"
+                                        | "i32" | "u64" | "i64" | "u128" | "i128" => {
+                                            ArgumentType::Integer
+                                        }
                                         _ => panic!("Unknown path type inside vec: {:?}", ident),
                                     };
 
@@ -159,6 +145,15 @@ struct OrderedArgument {
     argument_type: ArgumentType,
 }
 
+impl OrderedArgument {
+    fn none(argument_type: ArgumentType) -> Self {
+        Self {
+            wrap_type: WrapType::None,
+            argument_type,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum WrapType {
     None,
@@ -168,23 +163,11 @@ enum WrapType {
 
 #[derive(Debug)]
 enum ArgumentType {
-    String,
-    USize,
-    ISize,
-    // Bool,
     // Char,
-    // U8,
-    // I8,
-    // U16,
-    // I16,
-    // U32,
-    // I32,
-    // U64,
-    // I64,
-    // U128,
-    // I128,
-    Float32,
-    Float64,
+    String,
+    Integer,
+    // Bool,
+    Float,
 }
 
 fn actions(ast: &DeriveInput) -> TokenStream {
@@ -260,14 +243,14 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                         }
                                     }
                                 }
-                                ArgumentType::USize | ArgumentType::ISize => {
+                                ArgumentType::Integer => {
                                     quote! {
                                         iter_args.next().map(|v| {
                                             v.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))
                                         }).transpose()?
                                     }
                                 }
-                                ArgumentType::Float32 | ArgumentType::Float64 => {
+                                ArgumentType::Float => {
                                     quote! {
                                         iter_args.next().map(|v| {
                                             v.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err))
@@ -289,14 +272,14 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                                         iter_args.map(|s| s.to_string()).collect::<Vec<_>>()
                                     }
                                 }
-                                ArgumentType::USize | ArgumentType::ISize => {
+                                ArgumentType::Integer => {
                                     quote! {
                                         iter_args
                                             .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err)))
                                             .collect::<Result<Vec<_>, _>>()?
                                     }
                                 }
-                                ArgumentType::Float32 | ArgumentType::Float64 => {
+                                ArgumentType::Float => {
                                     quote! {
                                         iter_args
                                             .map(|s| s.parse().map_err(|err| ::slowchop_console::Error::ParseFloatError(#name_str.to_string(), err)))
@@ -385,7 +368,7 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                 }
             }
         }
-        ArgumentType::USize | ArgumentType::ISize => {
+        ArgumentType::Integer => {
             quote! {
                 iter_args
                     .next()
@@ -396,7 +379,7 @@ fn parse_argument_type(argument_type: &ArgumentType, is_last: bool, name_str: &s
                     .map_err(|err| ::slowchop_console::Error::ParseIntError(#name_str.to_string(), err))?
             }
         }
-        ArgumentType::Float32 | ArgumentType::Float64 => {
+        ArgumentType::Float => {
             quote! {
                 iter_args
                     .next()

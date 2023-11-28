@@ -145,8 +145,8 @@ fn resolve_two_floats() -> Result<(), Error> {
 #[test]
 fn resolve_int_types() -> Result<(), Error> {
     assert_eq!(
-        Con::resolve("DifferentIntTypes 1 2")?,
-        Con::DifferentIntTypes(1, 2)
+        Con::resolve("LotsOfDifferentIntTypes 1 2 3 -4 5 -600 7 -80000 9 -10000000000 11 -12")?,
+        Con::LotsOfDifferentIntTypes(1, 2, 3, -4, 5, -600, 7, -80000, 9, -10000000000, 11, -12)
     );
 
     Ok(())
@@ -236,7 +236,20 @@ enum Con {
     Echo(String),
     TwoStrings(String, String),
     TwoFloats(f32, f64),
-    DifferentIntTypes(isize, usize),
+    LotsOfDifferentIntTypes(
+        isize,
+        usize,
+        u8,
+        i8,
+        u16,
+        i16,
+        u32,
+        i32,
+        u64,
+        i64,
+        u128,
+        i128,
+    ),
     VecString(Vec<String>),
     VecFloat32(Vec<f32>),
     VecISize(Vec<isize>),
