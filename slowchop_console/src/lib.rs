@@ -1,6 +1,6 @@
-mod actions;
 mod error;
 mod plugin;
+mod subscriber;
 
 pub use error::Error;
 pub use plugin::{Console, ConsolePlugin};

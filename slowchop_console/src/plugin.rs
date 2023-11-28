@@ -1,15 +1,11 @@
-use crate::{ActionsImpl, Error};
+use crate::ActionsImpl;
 use bevy::log::Level;
 use bevy::prelude::*;
-use bevy::utils::tracing::field::{Field, Visit};
-use bevy::utils::tracing::Subscriber;
 use bevy::window::PrimaryWindow;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tracing_subscriber::layer::Context;
-use tracing_subscriber::Layer;
 
 pub struct EntityEntry {
     pub entity: Entity,
@@ -71,7 +67,7 @@ pub struct ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
-    queued_entries: Arc<Mutex<Vec<Entry>>>,
+    pub(crate) queued_entries: Arc<Mutex<Vec<Entry>>>,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -95,7 +91,7 @@ where
         app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
         app.add_event::<A>();
         app.add_event::<SubmittedText>();
-        app.add_systems(Startup, (setup_console::<A>));
+        app.add_systems(Startup, setup_console::<A>);
         app.add_systems(
             Update,
             (
@@ -108,42 +104,6 @@ where
                     .chain(),
             ),
         );
-    }
-}
-
-impl<A, S> Layer<S> for ConsolePlugin<A>
-where
-    A: ActionsImpl + Debug + Event + Send + Sync + 'static,
-    S: Subscriber,
-{
-    fn on_event(&self, event: &bevy::utils::tracing::Event<'_>, _ctx: Context<'_, S>) {
-        let mut visitor = ConsoleVisitor::new();
-
-        let level = event.metadata().level();
-        event.record(&mut visitor);
-
-        let entry = Entry {
-            when: Instant::now(),
-            level: level.to_owned(),
-            message: visitor.0,
-        };
-
-        let mut lines = self.queued_entries.lock().unwrap();
-        lines.push(entry);
-    }
-}
-
-struct ConsoleVisitor(String);
-
-impl ConsoleVisitor {
-    fn new() -> Self {
-        Self(String::new())
-    }
-}
-
-impl Visit for ConsoleVisitor {
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0.push_str(&format!("{:?} ", value));
     }
 }
 
@@ -250,7 +210,6 @@ fn update_history<A>(
     mut commands: Commands,
     mut console: ResMut<Console<A>>,
     mut history_query: Query<Entity, With<History>>,
-    mut text_query: Query<(Entity, &mut Text), Without<History>>,
 ) where
     A: Send + Sync + 'static,
 {
@@ -343,11 +302,10 @@ fn handle_submitted_text<A>(
     for text in submitted_text_reader.read() {
         match A::resolve(&text.0) {
             Ok(action) => {
-                info!("yay Action: {:?}", action);
                 actions_writer.send(action);
             }
             Err(e) => {
-                error!("Error: {:?}", e);
+                error!("Error: {e:#?}");
             }
         }
     }
