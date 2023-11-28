@@ -15,6 +15,7 @@ pub fn actions_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 #[derive(Debug)]
 struct Action {
     name: String,
+    ident: syn::Ident,
     action_type: ActionType,
 }
 
@@ -128,7 +129,11 @@ impl Action {
             }
         };
 
-        Action { name, action_type }
+        Action {
+            name,
+            ident: variant.ident.clone(),
+            action_type,
+        }
     }
 }
 
@@ -164,7 +169,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     let variants = match &ast.data {
         syn::Data::Enum(data) => &data.variants,
         _ => {
-            panic!("Actions can only be derived for enums: {:?}", ast.ident);
+            panic!("Actions can only be derived for enums: {:?}", name);
         }
     };
 
@@ -173,9 +178,9 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     // TODO: Make sure there are no options after required arguments.
     // TODO: Make sure Vec is only the last argument.
 
-    let resove_actions = actions.iter().map(|action| {
+    let resolve_actions = actions.iter().map(|action| {
         let name_str = &action.name;
-        let name_ident = syn::Ident::new(name_str, name_str.span());
+        let name_ident = &action.ident;
 
         let mut tokens = vec![];
         match &action.action_type {
@@ -304,6 +309,8 @@ fn actions(ast: &DeriveInput) -> TokenStream {
             }
         }
 
+        let name_str = name_str.to_lowercase();
+
         quote! {
             #name_str => {
                 #(#tokens)*
@@ -324,8 +331,8 @@ fn actions(ast: &DeriveInput) -> TokenStream {
                 let user_args = &items[1..];
                 let mut iter_args = user_args.iter();
 
-                match user_action.as_str() {
-                    #(#resove_actions)*
+                match user_action.to_lowercase().as_str() {
+                    #(#resolve_actions)*
                     _ => Err(::slowchop_console::Error::UnknownAction {
                         action: user_action.to_string()
                     }),

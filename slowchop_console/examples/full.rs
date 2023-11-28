@@ -10,6 +10,7 @@ use tracing_subscriber::EnvFilter;
 #[derive(Actions, Clone, Debug, Event)]
 enum MyGameActions {
     Spawn(f32),
+    Quit,
 
     Trace,
     Debug,
@@ -50,6 +51,7 @@ fn setup_camera(mut commands: Commands) {
 fn handle_actions(mut actions: EventReader<MyGameActions>) {
     for action in actions.read() {
         match action {
+            MyGameActions::Quit => std::process::exit(0),
             MyGameActions::Spawn(count) => info!("Spawning {} entities.", count),
             MyGameActions::Trace => trace!("Tracing 0xABCDEF 0xABCDEF 0xABCDEF"),
             MyGameActions::Debug => debug!("Debug 0xABCDEF"),
