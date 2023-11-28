@@ -316,7 +316,7 @@ fn actions(ast: &DeriveInput) -> TokenStream {
     quote! {
         impl ::slowchop_console::ActionsHandler for #name {
             fn resolve(s: &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
-                let items = shlex::split(s).unwrap();
+                let items = ::slowchop_console::shlex::split(s).unwrap();
                 if items.len() == 0 {
                     return Err(::slowchop_console::Error::NoActionGiven);
                 }

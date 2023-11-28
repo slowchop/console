@@ -45,6 +45,7 @@ mod subscriber;
 
 pub use error::Error;
 pub use plugin::{Console, ConsolePlugin};
+pub use shlex;
 pub use slowchop_console_derive::Actions;
 
 /// The trait that is derived by the `Actions` derive macro.
