@@ -7,6 +7,7 @@ repository = "https://github.com/slowchop/console"
 description = "A Quake style console and log plugin for Bevy."
 keywords = ["bevy", "console", "log", "quake"]
 categories = ["game-development", "command-line-interface"]
+readme = "README.md"
 
 [dependencies]
 slowchop_console_derive = { version = "0.1.0", path = "../slowchop_console_derive" }

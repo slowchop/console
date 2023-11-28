@@ -8,7 +8,7 @@ readme:
 	    -r slowchop_console \
 	    --no-title \
 	    --no-indent-headings \
-	    -o ../README.md
+	    -o README.md
 
 release: readme test
     cargo publish -p slowchop_console_derive
