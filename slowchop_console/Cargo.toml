@@ -1,6 +1,6 @@
 [package]
 name = "slowchop_console"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/slowchop/console"
@@ -10,7 +10,7 @@ categories = ["game-development", "command-line-interface"]
 readme = "README.md"
 
 [dependencies]
-slowchop_console_derive = { version = "0.1.0", path = "../slowchop_console_derive" }
+slowchop_console_derive = { version = "0.1.2", path = "../slowchop_console_derive" }
 thiserror = "1.0.50"
 shlex = "1.2.0"
 tracing-subscriber = "0.3.18"

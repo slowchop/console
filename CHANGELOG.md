@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2023-11-29
+
+### Added
+
+- Adjustable Z-Index for the console. Defaults to 100.
+
 ## [0.1.1] - 2023-11-29
 
 ### Fixed
