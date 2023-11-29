@@ -35,10 +35,15 @@ pub struct Console<A> {
     pub open_key_code: Option<KeyCode>,
     pub close_key_code: Option<KeyCode>,
 
+    /// Adjusts the z-index of the console.
+    pub z_index: i32,
+
     pub font_size: f32,
 
     /// The console is open if this is true.
-    pub open: bool,
+    ///
+    /// use open(), toggle() or close() to change this.
+    open: bool,
 
     /// To stop the toggle from opening and closing the console on the same frame.
     did_close_this_frame: bool,
@@ -77,6 +82,7 @@ impl<A> Console<A> {
             input_did_update: true,
             console_did_toggle: true,
             phantom_data: Default::default(),
+            z_index: 100,
         }
     }
 
@@ -177,6 +183,7 @@ fn setup_console<A>(
         Root,
         NodeBundle {
             visibility: Visibility::Hidden,
+            z_index: ZIndex::Global(console.z_index),
             style: Style {
                 width: Val::Percent(100.),
                 height: Val::Px(
