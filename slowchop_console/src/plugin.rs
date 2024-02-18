@@ -351,13 +351,19 @@ fn get_keyboard_input<A>(
     A: Send + Sync + 'static,
 {
     for key in key_events.read() {
-        if key.char == "\r" {
-            submitted_text_writer.send(SubmittedText(console.input.clone()));
-            console.input.clear();
-        } else if key.char == "\u{7F}" {
-            console.input.pop();
-        } else {
-            console.input += &key.char.to_string();
+        trace!(?key);
+        match key.char.as_str() {
+            "\r" => {
+                submitted_text_writer.send(SubmittedText(console.input.clone()));
+            }
+            // Backspace
+            //
+            "\u{7F}" | "\u{8}" => {
+                console.input.pop();
+            }
+            _ => {
+                console.input += &key.char.to_string();
+            }
         }
 
         console.input_did_update = true;
