@@ -203,9 +203,6 @@ fn setup_console<A>(
     ));
 
     group.with_children(|parent| {
-        // crashes with
-        // thread 'main' panicked at /Users/gak/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bevy_ui-0.13.0/src/layout/mod.rs:131:60:
-        // called `Option::unwrap()` on a `None` value
         parent.spawn((
             Name::new("Input"),
             InputText,
@@ -218,7 +215,7 @@ fn setup_console<A>(
                 },
                 background_color: Color::BLACK.into(),
                 text: Text::from_section(
-                    "arst",
+                    "",
                     TextStyle {
                         color: Color::ANTIQUE_WHITE,
                         font_size: console.font_size,
@@ -417,19 +414,13 @@ fn update_visibility<A>(
     A: Send + Sync + 'static,
 {
     if console.console_did_toggle {
-        info!("console_did_toggle");
         let mut visibility = query.single_mut();
-        info!("visibility: {:#?}", visibility);
         if console.open {
-            info!("open");
             *visibility = Visibility::Visible;
         } else {
-            info!("hidden");
             *visibility = Visibility::Hidden;
         }
-        info!("done visibility: {:#?}", visibility);
         console.console_did_toggle = false;
-        info!("console_did_toggle = false");
     }
 }
 
