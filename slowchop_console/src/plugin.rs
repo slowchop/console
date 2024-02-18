@@ -5,7 +5,7 @@ use bevy::window::PrimaryWindow;
 use once_cell::sync::Lazy;
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use tracing_subscriber::layer::SubscriberExt;
 
 /// Unable to work out how to pass in an instance to LogPlugin update_subscriber, so using a global
@@ -67,7 +67,6 @@ pub struct Console<A> {
     input_did_update: bool,
 
     entity_entries: VecDeque<EntityEntry>,
-    // queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -78,7 +77,6 @@ impl<A> Console<A> {
             toggle_key_code: Some(KeyCode::Backquote),
             close_key_code: Some(KeyCode::Escape),
             open_key_code: None,
-            // queued_entries,
             entity_entries: Default::default(),
             max_lines: 100,
             font_size: 20.0,
@@ -109,8 +107,7 @@ impl<A> Console<A> {
 
     fn take_queued_entries(&self) -> Vec<Entry> {
         let mut entries = QUEUED_ENTRIES.0.lock().unwrap();
-        let mut entries = entries.drain(..).collect();
-        entries
+        entries.drain(..).collect()
     }
 }
 
@@ -119,7 +116,6 @@ pub struct ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
-    // pub(crate) queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -138,15 +134,9 @@ where
 {
     fn default() -> Self {
         Self {
-            // queued_entries: Default::default(),
             phantom_data: Default::default(),
         }
     }
-}
-
-fn update_subscriber(queued_entries: QueuedEntries) -> impl Fn(BoxedSubscriber) -> BoxedSubscriber {
-    // Box::new(subscriber.with(CustomLayer))
-    |_| todo!()
 }
 
 impl<A> Plugin for ConsolePlugin<A>
@@ -154,11 +144,6 @@ where
     A: ActionsHandler + Debug + Event + Send + Sync + 'static,
 {
     fn build(&self, app: &mut App) {
-        // app.add_plugins(bevy::log::LogPlugin {
-        //     update_subscriber: Some(|a| a),
-        //     ..default()
-        // });
-        // app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
         app.insert_resource(Console::<A>::new());
         app.add_event::<A>();
         app.add_event::<SubmittedText>();

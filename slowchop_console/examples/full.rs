@@ -21,17 +21,6 @@ enum MyGameActions {
 pub fn main() {
     let console_plugin = ConsolePlugin::<MyGameActions>::default();
 
-    // let default_filter = "trace,wgpu=error,naga=warn,bevy=info,winit=info,gilrs=info".to_string();
-    // let filter_layer = EnvFilter::try_from_default_env()
-    //     .or_else(|_| EnvFilter::try_new(&default_filter))
-    //     .unwrap();
-    //
-    // tracing_subscriber::registry()
-    //     .with(filter_layer)
-    //     .with(tracing_subscriber::fmt::Layer::new().with_ansi(true))
-    //     .with(console_plugin.clone())
-    //     .init();
-
     App::new()
         .add_plugins((
             DefaultPlugins.set(bevy::log::LogPlugin {
@@ -55,7 +44,6 @@ fn start_with_console_open(mut console: ResMut<Console<MyGameActions>>) {
 
     info!("Press ` (backtick) or ~ (tilde) (KeyCode::Backquote) to toggle the console.");
     info!("Press Escape to close the console.");
-    info!("Press F1 to toggle the World Inspector.");
 }
 
 fn handle_actions(mut actions: EventReader<MyGameActions>) {
