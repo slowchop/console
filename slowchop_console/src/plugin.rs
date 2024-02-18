@@ -10,7 +10,7 @@ use tracing_subscriber::layer::SubscriberExt;
 
 /// Unable to work out how to pass in an instance to LogPlugin update_subscriber, so using a global
 /// static to give access to all QueuedEntries instances.
-static QUEUED_ENTRIES: Lazy<QueuedEntries> = Lazy::new(|| QueuedEntries::default());
+pub static QUEUED_ENTRIES: Lazy<QueuedEntries> = Lazy::new(|| QueuedEntries::default());
 
 /// A container for entries that are queued up to be added to the console.
 ///
@@ -121,6 +121,15 @@ where
 {
     // pub(crate) queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
+}
+
+impl<A> ConsolePlugin<A>
+where
+    A: Send + Sync + ActionsHandler + Debug,
+{
+    pub fn update_subscriber(&self) -> fn(BoxedSubscriber) -> BoxedSubscriber {
+        |subscriber| Box::new(subscriber.with(ConsolePlugin::<A>::default()))
+    }
 }
 
 impl<A> Default for ConsolePlugin<A>

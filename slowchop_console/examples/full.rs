@@ -34,8 +34,10 @@ pub fn main() {
 
     App::new()
         .add_plugins((
-            DefaultPlugins,
-            // DefaultPlugins.build().disable::<LogPlugin>(),
+            DefaultPlugins.set(bevy::log::LogPlugin {
+                update_subscriber: Some(console_plugin.update_subscriber()),
+                ..default()
+            }),
             console_plugin,
             // WorldInspectorPlugin::new().run_if(input_toggle_active(false, KeyCode::F1)),
         ))
