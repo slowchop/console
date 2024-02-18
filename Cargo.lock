@@ -2410,6 +2410,7 @@ name = "slowchop_console"
 version = "0.1.2"
 dependencies = [
  "bevy",
+ "once_cell",
  "shlex",
  "slowchop_console_derive",
  "thiserror",

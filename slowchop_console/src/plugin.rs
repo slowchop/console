@@ -1,16 +1,22 @@
 use crate::ActionsHandler;
-use bevy::log::Level;
+use bevy::log::{BoxedSubscriber, Level};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use once_cell::sync::Lazy;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
+use tracing_subscriber::layer::SubscriberExt;
+
+/// Unable to work out how to pass in an instance to LogPlugin update_subscriber, so using a global
+/// static to give access to all QueuedEntries instances.
+static QUEUED_ENTRIES: Lazy<QueuedEntries> = Lazy::new(|| QueuedEntries::default());
 
 /// A container for entries that are queued up to be added to the console.
 ///
 /// This was created specifically to use with the tracing subscriber.
-#[derive(Debug, Clone, Default)]
-pub struct QueuedEntries(pub(crate) Arc<Mutex<Vec<Entry>>>);
+#[derive(Debug, Default)]
+pub struct QueuedEntries(pub(crate) Mutex<Vec<Entry>>);
 
 #[derive(Debug)]
 struct EntityEntry {
@@ -61,18 +67,18 @@ pub struct Console<A> {
     input_did_update: bool,
 
     entity_entries: VecDeque<EntityEntry>,
-    queued_entries: QueuedEntries,
+    // queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
 }
 
 impl<A> Console<A> {
-    pub fn with_lines(queued_entries: QueuedEntries) -> Self {
+    pub fn new() -> Self {
         Console {
             input: "".to_string(),
             toggle_key_code: Some(KeyCode::Backquote),
             close_key_code: Some(KeyCode::Escape),
             open_key_code: None,
-            queued_entries,
+            // queued_entries,
             entity_entries: Default::default(),
             max_lines: 100,
             font_size: 20.0,
@@ -100,6 +106,12 @@ impl<A> Console<A> {
         self.open = !self.open;
         self.console_did_toggle = true;
     }
+
+    fn take_queued_entries(&self) -> Vec<Entry> {
+        let mut entries = QUEUED_ENTRIES.0.lock().unwrap();
+        let mut entries = entries.drain(..).collect();
+        entries
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -107,7 +119,7 @@ pub struct ConsolePlugin<A>
 where
     A: Send + Sync + 'static,
 {
-    pub(crate) queued_entries: QueuedEntries,
+    // pub(crate) queued_entries: QueuedEntries,
     phantom_data: std::marker::PhantomData<A>,
 }
 
@@ -117,10 +129,15 @@ where
 {
     fn default() -> Self {
         Self {
-            queued_entries: Default::default(),
+            // queued_entries: Default::default(),
             phantom_data: Default::default(),
         }
     }
+}
+
+fn update_subscriber(queued_entries: QueuedEntries) -> impl Fn(BoxedSubscriber) -> BoxedSubscriber {
+    // Box::new(subscriber.with(CustomLayer))
+    |_| todo!()
 }
 
 impl<A> Plugin for ConsolePlugin<A>
@@ -128,7 +145,12 @@ where
     A: ActionsHandler + Debug + Event + Send + Sync + 'static,
 {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
+        // app.add_plugins(bevy::log::LogPlugin {
+        //     update_subscriber: Some(|a| a),
+        //     ..default()
+        // });
+        // app.insert_resource(Console::<A>::with_lines(self.queued_entries.clone()));
+        app.insert_resource(Console::<A>::new());
         app.add_event::<A>();
         app.add_event::<SubmittedText>();
         app.add_systems(Startup, setup_console::<A>);
@@ -270,10 +292,7 @@ fn update_history<A>(
     A: Send + Sync + 'static,
 {
     // Mutex lock and remove all items from queued vec.
-    let new_entries = {
-        let mut queued_entries = console.queued_entries.0.lock().unwrap();
-        std::mem::take(&mut *queued_entries)
-    };
+    let new_entries = console.take_queued_entries();
 
     if new_entries.is_empty() {
         return;
