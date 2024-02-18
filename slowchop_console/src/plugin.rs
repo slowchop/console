@@ -69,7 +69,7 @@ impl<A> Console<A> {
     pub fn with_lines(queued_entries: QueuedEntries) -> Self {
         Console {
             input: "".to_string(),
-            toggle_key_code: Some(KeyCode::Grave),
+            toggle_key_code: Some(KeyCode::Backquote),
             close_key_code: Some(KeyCode::Escape),
             open_key_code: None,
             queued_entries,
@@ -176,7 +176,9 @@ fn setup_console<A>(
 ) where
     A: Send + Sync + 'static,
 {
-    let window = window.single();
+    let Ok(window) = window.get_single() else {
+        return;
+    };
 
     let mut group = commands.spawn((
         Name::new("Console"),
@@ -188,7 +190,7 @@ fn setup_console<A>(
                 width: Val::Percent(100.),
                 height: Val::Px(
                     window.resolution.height()
-                        * window.resolution.scale_factor() as f32
+                        * window.resolution.scale_factor()
                         * console.expand_fraction,
                 ),
                 flex_direction: FlexDirection::ColumnReverse,
@@ -201,6 +203,9 @@ fn setup_console<A>(
     ));
 
     group.with_children(|parent| {
+        // crashes with
+        // thread 'main' panicked at /Users/gak/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bevy_ui-0.13.0/src/layout/mod.rs:131:60:
+        // called `Option::unwrap()` on a `None` value
         parent.spawn((
             Name::new("Input"),
             InputText,
@@ -213,7 +218,7 @@ fn setup_console<A>(
                 },
                 background_color: Color::BLACK.into(),
                 text: Text::from_section(
-                    "",
+                    "arst",
                     TextStyle {
                         color: Color::ANTIQUE_WHITE,
                         font_size: console.font_size,
@@ -336,13 +341,13 @@ fn get_keyboard_input<A>(
     A: Send + Sync + 'static,
 {
     for key in key_events.read() {
-        if key.char == '\r' {
+        if key.char == "\r" {
             submitted_text_writer.send(SubmittedText(console.input.clone()));
             console.input.clear();
-        } else if key.char == '\u{7F}' {
+        } else if key.char == "\u{7F}" {
             console.input.pop();
         } else {
-            console.input.push(key.char);
+            console.input += &key.char.to_string();
         }
 
         console.input_did_update = true;
@@ -357,7 +362,7 @@ where
 }
 
 /// Run this before handling keyboard to close the console if it is open.
-fn close_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<Input<KeyCode>>)
+fn close_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<ButtonInput<KeyCode>>)
 where
     A: Send + Sync + 'static,
 {
@@ -382,7 +387,7 @@ where
 }
 
 /// Run this after handling keyboard to open the console if it is closed.
-fn open_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<Input<KeyCode>>)
+fn open_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<ButtonInput<KeyCode>>)
 where
     A: Send + Sync + 'static,
 {
@@ -412,12 +417,19 @@ fn update_visibility<A>(
     A: Send + Sync + 'static,
 {
     if console.console_did_toggle {
+        info!("console_did_toggle");
+        let mut visibility = query.single_mut();
+        info!("visibility: {:#?}", visibility);
         if console.open {
-            *query.single_mut() = Visibility::Visible;
+            info!("open");
+            *visibility = Visibility::Visible;
         } else {
-            *query.single_mut() = Visibility::Hidden;
+            info!("hidden");
+            *visibility = Visibility::Hidden;
         }
+        info!("done visibility: {:#?}", visibility);
         console.console_did_toggle = false;
+        info!("console_did_toggle = false");
     }
 }
 
