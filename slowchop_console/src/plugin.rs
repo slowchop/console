@@ -223,11 +223,7 @@ fn setup_console<A>(
                 padding: UiRect::all(Val::Px(0.)),
                 margin: UiRect::all(Val::Px(0.)),
                 width: Val::Percent(100.),
-                height: Val::Px(
-                    window.resolution.height()
-                        * window.resolution.scale_factor()
-                        * console.expand_fraction,
-                ),
+                height: Val::Px(window.resolution.height() * console.expand_fraction),
                 flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
