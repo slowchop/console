@@ -10,7 +10,7 @@ use tracing_subscriber::layer::SubscriberExt;
 
 /// Unable to work out how to pass in an instance to LogPlugin update_subscriber, so using a global
 /// static to give access to all QueuedEntries instances.
-pub static QUEUED_ENTRIES: Lazy<QueuedEntries> = Lazy::new(|| QueuedEntries::default());
+pub static QUEUED_ENTRIES: Lazy<QueuedEntries> = Lazy::new(QueuedEntries::default);
 
 /// A container for entries that are queued up to be added to the console.
 ///
@@ -80,7 +80,29 @@ pub struct Console<A> {
 }
 
 impl<A> Console<A> {
-    pub fn new() -> Self {
+    pub fn open(&mut self) {
+        self.open = true;
+        self.console_did_toggle = true;
+    }
+
+    pub fn close(&mut self) {
+        self.open = false;
+        self.console_did_toggle = true;
+    }
+
+    pub fn toggle(&mut self) {
+        self.open = !self.open;
+        self.console_did_toggle = true;
+    }
+
+    fn take_queued_entries(&self) -> Vec<Entry> {
+        let mut entries = QUEUED_ENTRIES.0.lock().unwrap();
+        entries.drain(..).collect()
+    }
+}
+
+impl<A> Default for Console<A> {
+    fn default() -> Self {
         Console {
             input: "".to_string(),
             toggle_key_code: Some(KeyCode::Backquote),
@@ -106,26 +128,6 @@ impl<A> Console<A> {
             debug_text_color: Color::hex("838A83").unwrap(),
             trace_text_color: Color::hex("445055").unwrap(),
         }
-    }
-
-    pub fn open(&mut self) {
-        self.open = true;
-        self.console_did_toggle = true;
-    }
-
-    pub fn close(&mut self) {
-        self.open = false;
-        self.console_did_toggle = true;
-    }
-
-    pub fn toggle(&mut self) {
-        self.open = !self.open;
-        self.console_did_toggle = true;
-    }
-
-    fn take_queued_entries(&self) -> Vec<Entry> {
-        let mut entries = QUEUED_ENTRIES.0.lock().unwrap();
-        entries.drain(..).collect()
     }
 }
 
@@ -162,7 +164,7 @@ where
     A: ActionsHandler + Debug + Event + Send + Sync + 'static,
 {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Console::<A>::new());
+        app.init_resource::<Console<A>>();
         app.add_event::<A>();
         app.add_event::<SubmittedText>();
         app.add_systems(Startup, setup_console::<A>);
@@ -193,9 +195,6 @@ where
 
 #[derive(Component)]
 struct Root;
-
-#[derive(Component)]
-struct Background;
 
 #[derive(Component)]
 struct History;
