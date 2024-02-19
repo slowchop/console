@@ -4,7 +4,7 @@ use slowchop_console::{Actions, Console, ConsolePlugin};
 #[derive(Actions, Clone, Debug, Event)]
 enum MyGameActions {
     Spawn(f32),
-    Quit(bool),
+    Quit,
 
     /// Demonstrates how trace messages are displayed.
     Trace,
@@ -19,6 +19,11 @@ enum MyGameActions {
 }
 
 pub fn main() {
+    let default_filter =
+        "trace,slowchop_console=info,wgpu=error,naga=warn,bevy=info,winit=info,gilrs=info"
+            .to_string();
+    std::env::set_var("RUST_LOG", default_filter);
+
     let console_plugin = ConsolePlugin::<MyGameActions>::default();
 
     App::new()
@@ -42,20 +47,17 @@ fn setup_camera(mut commands: Commands) {
 fn start_with_console_open(mut console: ResMut<Console<MyGameActions>>) {
     console.open();
 
+    trace!(?console.background_color, "This is a test trace message with a variable.");
+    debug!("This is a test debug message: 0xABCDEF");
     info!("Press ` (backtick) or ~ (tilde) (KeyCode::Backquote) to toggle the console.");
-    info!("Press Escape to close the console.");
+    warn!("Press Escape to close the console.");
+    error!("This is a test error message: 0xABCDEF");
 }
 
 fn handle_actions(mut actions: EventReader<MyGameActions>) {
     for action in actions.read() {
         match action {
-            MyGameActions::Quit(sure) => {
-                if *sure {
-                    std::process::exit(0)
-                } else {
-                    warn!("Got a false argument! Pass in a true (or 1, t, y, yes, yeah) to actually quit.");
-                }
-            }
+            MyGameActions::Quit => std::process::exit(0),
             MyGameActions::Spawn(count) => info!("Spawning {} entities.", count),
             MyGameActions::Trace => trace!("Tracing 0xABCDEF 0xABCDEF 0xABCDEF"),
             MyGameActions::Debug => debug!("Debug 0xABCDEF"),

@@ -41,6 +41,15 @@ pub struct Console<A> {
     pub open_key_code: Option<KeyCode>,
     pub close_key_code: Option<KeyCode>,
 
+    pub background_color: Color,
+    pub input_background_color: Color,
+    pub input_text_color: Color,
+    pub error_text_color: Color,
+    pub warn_text_color: Color,
+    pub info_text_color: Color,
+    pub debug_text_color: Color,
+    pub trace_text_color: Color,
+
     /// Adjusts the z-index of the console.
     pub z_index: i32,
 
@@ -79,14 +88,23 @@ impl<A> Console<A> {
             open_key_code: None,
             entity_entries: Default::default(),
             max_lines: 100,
-            font_size: 20.0,
+            font_size: 16.0,
             open: false,
             did_close_this_frame: false,
-            expand_fraction: 0.5,
+            expand_fraction: 0.8,
             input_did_update: true,
             console_did_toggle: true,
             phantom_data: Default::default(),
             z_index: 100,
+
+            background_color: Color::hex("#0E181A").unwrap(),
+            input_background_color: Color::hex("445055").unwrap(),
+            input_text_color: Color::WHITE,
+            error_text_color: Color::hex("FD564C").unwrap(),
+            warn_text_color: Color::hex("FFE76A").unwrap(),
+            info_text_color: Color::hex("81C6DC").unwrap(),
+            debug_text_color: Color::hex("838A83").unwrap(),
+            trace_text_color: Color::hex("445055").unwrap(),
         }
     }
 
@@ -183,7 +201,7 @@ struct Background;
 struct History;
 
 #[derive(Component)]
-struct InputText;
+pub(crate) struct InputText;
 
 fn setup_console<A>(
     mut commands: Commands,
@@ -203,6 +221,8 @@ fn setup_console<A>(
             visibility: Visibility::Hidden,
             z_index: ZIndex::Global(console.z_index),
             style: Style {
+                padding: UiRect::all(Val::Px(0.)),
+                margin: UiRect::all(Val::Px(0.)),
                 width: Val::Percent(100.),
                 height: Val::Px(
                     window.resolution.height()
@@ -212,42 +232,56 @@ fn setup_console<A>(
                 flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
-            // background_color: Color::PURPLE.into(),
-            background_color: Color::INDIGO.into(),
+            background_color: console.background_color.into(),
             ..default()
         },
     ));
 
     group.with_children(|parent| {
-        parent.spawn((
-            Name::new("Input"),
-            InputText,
-            TextBundle {
-                style: Style {
-                    flex_grow: 0.,
-                    min_height: Val::Px(console.font_size),
-                    margin: UiRect::all(Val::Px(5.)),
-                    ..default()
-                },
-                background_color: Color::BLACK.into(),
-                text: Text::from_section(
-                    "",
-                    TextStyle {
-                        color: Color::ANTIQUE_WHITE,
-                        font_size: console.font_size,
+        parent
+            .spawn((
+                Name::new("Input Container"),
+                NodeBundle {
+                    background_color: console.input_background_color.into(),
+                    style: Style {
+                        flex_grow: 0.,
+                        padding: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(2.), Val::Px(2.)),
+                        margin: UiRect::top(Val::Px(7.)),
                         ..default()
                     },
-                ),
-                transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
-                ..default()
-            },
-        ));
+                    ..default()
+                },
+            ))
+            .with_children(|parent| {
+                parent.spawn((
+                    Name::new("Input"),
+                    InputText,
+                    TextBundle {
+                        style: Style {
+                            min_height: Val::Px(console.font_size),
+                            flex_grow: 0.,
+                            padding: UiRect::all(Val::Px(0.)),
+                            margin: UiRect::all(Val::Px(0.)),
+                            ..default()
+                        },
+                        text: Text::from_section(
+                            "",
+                            TextStyle {
+                                color: console.input_text_color,
+                                font_size: console.font_size,
+                                ..default()
+                            },
+                        ),
+                        transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
+                        ..default()
+                    },
+                ));
+            });
 
         parent.spawn((
             Name::new("History"),
             History,
             NodeBundle {
-                // background_color: Color::INDIGO.into(),
                 style: Style {
                     overflow: Overflow::clip_y(),
                     flex_direction: FlexDirection::Column,
@@ -298,11 +332,11 @@ fn update_history<A>(
     // history node.
     for entry in new_entries {
         let color = match entry.level {
-            Level::TRACE => Color::GRAY,
-            Level::DEBUG => Color::WHITE,
-            Level::INFO => Color::LIME_GREEN,
-            Level::WARN => Color::YELLOW,
-            Level::ERROR => Color::ORANGE_RED,
+            Level::TRACE => console.trace_text_color,
+            Level::DEBUG => console.debug_text_color,
+            Level::INFO => console.info_text_color,
+            Level::WARN => console.warn_text_color,
+            Level::ERROR => console.error_text_color,
         };
 
         let entity = commands
@@ -318,7 +352,7 @@ fn update_history<A>(
                         },
                     ),
                     style: Style {
-                        margin: UiRect::all(Val::Px(5.)),
+                        margin: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(0.), Val::Px(0.)),
                         ..default()
                     },
                     ..default()
@@ -353,11 +387,12 @@ fn get_keyboard_input<A>(
     for key in key_events.read() {
         trace!(?key);
         match key.char.as_str() {
+            // Enter
             "\r" => {
                 submitted_text_writer.send(SubmittedText(console.input.clone()));
+                console.input.clear();
             }
             // Backspace
-            //
             "\u{7F}" | "\u{8}" => {
                 console.input.pop();
             }

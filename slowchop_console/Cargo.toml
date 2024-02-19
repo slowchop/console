@@ -32,6 +32,7 @@ default-features = false
 features = [
     "bevy_winit",
     "bevy_ui",
+    "bevy_gizmos",
     "default_font",
     "bevy_pbr", # This causes warnings when not included
 ]
