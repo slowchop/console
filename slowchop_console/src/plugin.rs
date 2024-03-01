@@ -480,8 +480,9 @@ fn handle_submitted_text<A>(
     A: ActionsHandler + Event + Debug + Send + Sync + 'static,
 {
     for text in submitted_text_reader.read() {
-        info!("> {}", &**text);
-        match A::resolve(&text.0) {
+        let mut text = text.to_string();
+        info!("> {}", &text);
+        match A::resolve(&mut text) {
             Ok(action) => {
                 actions_writer.send(action);
             }

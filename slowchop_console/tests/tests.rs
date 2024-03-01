@@ -1,5 +1,38 @@
 use slowchop_console::{Actions, ActionsHandler, Error};
 
+#[derive(Debug, PartialEq, Actions)]
+enum Con {
+    Quit,
+    Echo(String),
+    TwoStrings(String, String),
+    TwoFloats(f32, f64),
+    LotsOfDifferentIntTypes(
+        isize,
+        usize,
+        u8,
+        i8,
+        u16,
+        i16,
+        u32,
+        i32,
+        u64,
+        i64,
+        u128,
+        i128,
+    ),
+    Bool(bool),
+    VecString(Vec<String>),
+    VecFloat32(Vec<f32>),
+    VecISize(Vec<isize>),
+    OptionalFloat(Option<f32>),
+    TwoOptionalFloats(Option<f32>, Option<String>),
+    RequiredThenOptional(String, Option<String>),
+    // Concat(String, Vec<String>),
+
+    // TODO: ordered struct: Value { key: String, set_value: Option<String> }
+    // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
+}
+
 #[test]
 fn resolve_unit() -> Result<(), Error> {
     assert_eq!(Con::resolve("Quit")?, Con::Quit);
@@ -136,40 +169,22 @@ fn required_then_optional() -> Result<(), Error> {
 }
 
 #[test]
-fn complete() {
-    // assert_eq!(Commands::complete("qu"), vec!["quit", "query"]);
-    // assert_eq!(Commands::complete("spawn a"), vec!["pple", "nt"]);
-}
+fn sub_enum() -> Result<(), Error> {
+    #[derive(Actions)]
+    enum Actions {
+        A,
+        B,
+    }
 
-#[derive(Debug, PartialEq, Actions)]
-enum Con {
-    Quit,
-    Echo(String),
-    TwoStrings(String, String),
-    TwoFloats(f32, f64),
-    LotsOfDifferentIntTypes(
-        isize,
-        usize,
-        u8,
-        i8,
-        u16,
-        i16,
-        u32,
-        i32,
-        u64,
-        i64,
-        u128,
-        i128,
-    ),
-    Bool(bool),
-    VecString(Vec<String>),
-    VecFloat32(Vec<f32>),
-    VecISize(Vec<isize>),
-    OptionalFloat(Option<f32>),
-    TwoOptionalFloats(Option<f32>, Option<String>),
-    RequiredThenOptional(String, Option<String>),
-    // Concat(String, Vec<String>),
+    #[derive(Actions)]
+    enum Sub {
+        C,
+        D,
+    }
 
-    // TODO: ordered struct: Value { key: String, set_value: Option<String> }
-    // TODO: ordered struct: Concat { separator: String, strings: Vec<String> }
+    assert_eq!(Actions::resolve("A C")?, Actions::A(Sub::C));
+    assert_eq!(Actions::resolve("A D")?, Actions::A(Sub::D));
+    assert_eq!(Actions::resolve("B")?, Actions::B);
+
+    Ok(())
 }

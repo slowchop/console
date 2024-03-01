@@ -23,4 +23,7 @@ pub enum Error {
 
     #[error("Bad argument at position:{0} {1}")]
     BadArgument(usize, String),
+
+    #[error("Parse error")]
+    WinnowParseError,
 }

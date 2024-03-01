@@ -1,8 +1,18 @@
+mod v2;
+
 extern crate proc_macro;
 
+use crate::v2::actions2;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, GenericArgument, PathArguments, PathSegment};
+
+#[proc_macro_derive(Actions2)]
+pub fn actions_derive_2(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let output: TokenStream = actions2(&input);
+    proc_macro::TokenStream::from(output)
+}
 
 #[proc_macro_derive(Actions)]
 pub fn actions_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -37,6 +47,9 @@ impl Action {
                             if let Some(argument_type) = ArgumentType::from_ident(ident) {
                                 OrderedArgument::none(argument_type)
                             } else {
+                                dbg!(&path);
+                                dbg!(&segment);
+                                dbg!(&ident);
                                 match ident.to_string().as_str() {
                                     "Option" => OrderedArgument {
                                         wrap_type: WrapType::Option,
@@ -101,7 +114,6 @@ enum WrapType {
 
 #[derive(Debug)]
 enum ArgumentType {
-    // Char,
     String,
     Integer,
     Bool,

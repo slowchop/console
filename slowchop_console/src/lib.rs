@@ -49,8 +49,14 @@ pub use shlex;
 pub use slowchop_console_derive::Actions;
 
 /// The trait that is derived by the `Actions` derive macro.
-pub trait ActionsHandler {
+pub trait ActionsHandlerOld {
     fn resolve(text: &str) -> Result<Self, Error>
+    where
+        Self: Sized;
+}
+
+pub trait ActionsHandler {
+    fn resolve(text: &mut str) -> Result<Self, Error>
     where
         Self: Sized;
 }

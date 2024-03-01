@@ -1,23 +1,27 @@
 use bevy::prelude::*;
-use slowchop_console::{Actions, Console, ConsolePlugin};
+use slowchop_console::{Actions, ActionsHandler, Console, ConsolePlugin};
+use slowchop_console_derive::Actions2;
 
-#[derive(Actions, Clone, Debug, Event)]
+#[derive(Actions2, Clone, Debug, Event)]
 enum MyGameActions {
-    Spawn(f32),
-
-    Quit,
-
-    /// Demonstrates how trace messages are displayed.
-    Trace,
-    /// Demonstrates how debug messages are displayed.
-    Debug,
-    /// Demonstrates how info messages are displayed.
-    Info,
-    /// Demonstrates how warn messages are displayed.
-    Warn,
-    /// Demonstrates how error messages are displayed.
-    Error,
+    Nope,
+    RefEnum(Vec2),
+    // RefEnum(EmuSub),
+    // RefEnumWithF32(EmuSub, f32),
+    // InlineStructToEnum { x: f32, y: Option<EmuSub> },
+    // RefStructToEnum(Struct),
 }
+
+// #[derive(Actions2, Clone, Debug)]
+// enum EmuSub {
+//     One,
+// }
+
+// #[derive(Actions2, Clone, Debug)]
+// struct Struct {
+//     x: f32,
+//     y: Option<EmuSub>,
+// }
 
 pub fn main() {
     let default_filter =
@@ -26,6 +30,8 @@ pub fn main() {
     std::env::set_var("RUST_LOG", default_filter);
 
     let console_plugin = ConsolePlugin::<MyGameActions>::default();
+
+    return;
 
     App::new()
         .add_plugins((
@@ -57,14 +63,6 @@ fn start_with_console_open(mut console: ResMut<Console<MyGameActions>>) {
 
 fn handle_actions(mut actions: EventReader<MyGameActions>) {
     for action in actions.read() {
-        match action {
-            MyGameActions::Quit => std::process::exit(0),
-            MyGameActions::Spawn(count) => info!("Spawning {} entities.", count),
-            MyGameActions::Trace => trace!("Tracing 0xABCDEF 0xABCDEF 0xABCDEF"),
-            MyGameActions::Debug => debug!("Debug 0xABCDEF"),
-            MyGameActions::Info => info!("Some lovely information."),
-            MyGameActions::Warn => warn!("Hello, this is a warning."),
-            MyGameActions::Error => error!("Error! Error! Error! This is an error message."),
-        }
+        info!(?action);
     }
 }
