@@ -5,17 +5,17 @@ use slowchop_console_derive::Actions2;
 #[derive(Actions2, Clone, Debug, Event)]
 enum MyGameActions {
     Nope,
-    RefEnum(Vec2),
-    // RefEnum(EmuSub),
+    // RefEnum(Vec2),
+    RefEnum(EmuSub),
     // RefEnumWithF32(EmuSub, f32),
     // InlineStructToEnum { x: f32, y: Option<EmuSub> },
     // RefStructToEnum(Struct),
 }
 
-// #[derive(Actions2, Clone, Debug)]
-// enum EmuSub {
-//     One,
-// }
+#[derive(Actions2, Clone, Debug)]
+enum EmuSub {
+    One,
+}
 
 // #[derive(Actions2, Clone, Debug)]
 // struct Struct {

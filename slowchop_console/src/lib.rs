@@ -40,6 +40,7 @@
 //! Check out the [full example](examples/full.rs) on how to integrate.
 
 mod error;
+mod parse;
 mod plugin;
 mod subscriber;
 

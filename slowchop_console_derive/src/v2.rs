@@ -34,6 +34,8 @@ struct StructField {
 
 pub fn actions2(ast: &DeriveInput) -> TokenStream {
     let action = parse(&ast);
+    dbg!(&action);
+
     validate(&action);
     generate(&action)
 }
@@ -101,30 +103,55 @@ fn generate(action: &Action) -> TokenStream {
     let action_ident = &action.ident;
     dbg!(action_ident);
 
-    let mut tokens = TokenStream::new();
+    // let mut tokens = TokenStream::new();
+    let mut tokens = Vec::new();
 
-    let ident = match &action.args {
+    match &action.args {
         Args::Enum(variants) => {
-            let Some(first) = &variants.get(0) else {
-                println!("No variants found");
-                return quote! {};
-            };
-            let ident = &first.fields[0];
-            ident
+            tokens.push(quote! {
+                let _enum = 1;
+            });
+
+            // We need to parse this "command" (or subcommand).
+            tokens.push(quote! {});
+
+            for variant in variants {
+                let variant_ident = &variant.ident;
+                let fields = &variant.fields;
+                for field in fields {
+                    tokens.push(quote! {
+                        let _field = 1;
+                        let x = #field::resolve(s);
+                    });
+                }
+            }
         }
-        _ => return quote! {},
+        x => {
+            let x = format!("{:?}", x);
+            //
+            tokens.push(quote! {
+                let x = "#x";
+            });
+        }
     };
 
-    dbg!(ident);
+    dbg!(&tokens);
 
     quote! {
         impl ::slowchop_console::ActionsHandler for #action_ident {
             fn resolve(s: &mut str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
 
+                let start = 1;
+
+                #(#tokens)*
+
+
                 // just to test the macro... i want to access the first enum ident
 
-                #ident::resolve(s)
+                // #ident::resolve(s)
 
+                let end = 1;
+                todo!()
             }
         }
     }
