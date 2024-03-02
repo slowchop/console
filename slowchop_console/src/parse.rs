@@ -1,6 +1,6 @@
 use crate::Error;
 use winnow::ascii::{alpha1, alphanumeric1, escaped_transform, space0};
-use winnow::combinator::{alt, cut_err, preceded, repeat, terminated};
+use winnow::combinator::{alt, cut_err, not, preceded, repeat, terminated};
 use winnow::token::{any, none_of, take_until, take_while};
 use winnow::{PResult, Parser};
 
@@ -19,49 +19,65 @@ fn parse_action<'s>(s: &mut &'s str) -> PResult<&'s str> {
 /// * "hello world" -> hello
 /// * "hello \"world\"" -> hello "world"
 /// * 'hello "world"' -> hello "world"
-fn parse_string<'s>(s: &mut &'s str) -> PResult<String> {
-    alt((
-        // string starting with double quotes
-        double_quote_string,
-        // string starting with single quotes
-        // single_quote_string,
-        // string with no quotes
-        // take_until(1.., space0),
-    ))
-    .parse_next(s)
-}
-
-fn double_quote_string<'s>(s: &mut &'s str) -> PResult<String> {
-    let quote = '"';
-
-    preceded(
-        quote,
-        cut_err(terminated(
-            repeat(0.., double_quote_char).fold(
-                || String::new(),
-                |mut acc, c| {
-                    acc.push(c);
-                    acc
-                },
-            ),
-            quote,
+fn parse_string(s: &mut &str) -> PResult<String> {
+    terminated(
+        alt((
+            //
+            quote_string('"'),
+            quote_string('\''),
+            string_no_space,
         )),
+        space0,
     )
     .parse_next(s)
 }
 
-fn double_quote_char<'s>(s: &mut &'s str) -> PResult<char> {
-    let c = none_of('\"').parse_next(s)?;
-    if c == '\\' {
-        any.verify_map(|c| {
-            Some(match c {
-                '"' | '\\' => c,
-                _ => return None,
-            })
-        })
+fn string_no_space(s: &mut &str) -> PResult<String> {
+    repeat(1.., none_of(' '))
+        .fold(
+            || String::new(),
+            |mut acc, c| {
+                acc.push(c);
+                acc
+            },
+        )
         .parse_next(s)
-    } else {
-        Ok(c)
+}
+
+fn quote_string<'s>(quote: char) -> impl Fn(&mut &'s str) -> PResult<String> {
+    move |s: &mut &'s str| {
+        preceded(
+            quote,
+            cut_err(terminated(
+                repeat(0.., quote_char(quote)).fold(
+                    || String::new(),
+                    |mut acc, c| {
+                        acc.push(c);
+                        acc
+                    },
+                ),
+                quote,
+            )),
+        )
+        .parse_next(s)
+    }
+}
+
+fn quote_char<'s>(quote: char) -> impl Fn(&mut &'s str) -> PResult<char> {
+    move |s: &mut &'s str| {
+        let c = none_of(quote).parse_next(s)?;
+        if c == '\\' {
+            any.verify_map(|c| {
+                if c == quote || c == '\\' {
+                    Some(c)
+                } else {
+                    None
+                }
+            })
+            .parse_next(s)
+        } else {
+            Ok(c)
+        }
     }
 }
 
@@ -87,14 +103,28 @@ mod tests {
     #[test]
     fn test_parse_string() {
         let test_cases = vec![
-            (r#""hello world""#, Ok("hello world")),
-            (r#""hello \"world\"""#, Ok(r#"hello "world""#)),
-            (r#"'hello "world\'s"'"#, Ok(r#"hello "world's""#)),
+            (r#"hello"#, "hello", "", true),
+            // No quotes so you can't have spaces.
+            (r#"hello world"#, "hello", "world", true),
+            (r#""hello world" !"#, "hello world", "!", true),
+            (r#""hello \"world\"""#, r#"hello "world""#, "", true),
+            (r#"'hello "world\'s"' !"#, r#"hello "world's""#, "!", true),
+            // Empty strings must be quoted.
+            (r#""#, r#""#, "", false),
+            (r#"'' !"#, r#""#, "!", true),
+            (r#""" !"#, r#""#, "!", true),
         ];
 
-        for (s, expected) in test_cases {
-            let mut s = s;
-            assert_eq!(parse_string.parse_next(&mut s), expected.map(String::from));
+        for fixture in test_cases {
+            let (s, expected, new_pointer, ok) = &fixture;
+            let mut s = *s;
+            let r = parse_string.parse_next(&mut s);
+            if *ok {
+                assert_eq!(r, Ok(expected.to_string()), "fixture: {:?}", fixture);
+            } else {
+                assert!(r.is_err(), "fixture: {:?}", fixture);
+            }
+            assert_eq!(s, *new_pointer, "fixture: {:?}", fixture);
         }
     }
 }
