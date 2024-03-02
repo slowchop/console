@@ -62,10 +62,12 @@ fn parse_enum(data_enum: &syn::DataEnum) -> Args {
 
     for variant in &data_enum.variants {
         let ident = variant.ident.clone();
+        let mut found_fields = Vec::new();
+
         match &variant.fields {
             Fields::Named(_) => {}
             Fields::Unnamed(fields) => {
-                let mut found_fields = Vec::new();
+                // let mut found_fields = Vec::new();
                 for field in &fields.unnamed {
                     match &field.ty {
                         syn::Type::Path(type_path) => {
@@ -84,14 +86,14 @@ fn parse_enum(data_enum: &syn::DataEnum) -> Args {
                         _ => {}
                     }
                 }
-
-                enum_variants.push(EnumVariant {
-                    ident,
-                    fields: found_fields,
-                });
             }
             Fields::Unit => {}
         }
+
+        enum_variants.push(EnumVariant {
+            ident,
+            fields: found_fields,
+        });
     }
 
     Args::Enum(enum_variants)
@@ -117,10 +119,17 @@ fn generate(action: &Action) -> TokenStream {
 
             for variant in variants {
                 let variant_ident = &variant.ident;
+                let variant_name = variant_ident.to_string();
                 let fields = &variant.fields;
+
+                tokens.push(quote! {
+                    let _variant = #variant_name;
+                });
+
                 for field in fields {
                     tokens.push(quote! {
                         let _field = 1;
+                        let _field = #field;
                         let x = #field::resolve(s);
                     });
                 }
@@ -130,7 +139,7 @@ fn generate(action: &Action) -> TokenStream {
             let x = format!("{:?}", x);
             //
             tokens.push(quote! {
-                let x = "#x";
+                let xxxxxx = "#x";
             });
         }
     };
