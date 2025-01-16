@@ -482,7 +482,7 @@ fn handle_submitted_text<A>(
     for text in submitted_text_reader.read() {
         let mut text = text.to_string();
         info!("> {}", &text);
-        match A::resolve(&mut text) {
+        match A::resolve(&mut text.as_str()) {
             Ok(action) => {
                 actions_writer.send(action);
             }

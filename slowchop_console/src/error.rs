@@ -1,3 +1,6 @@
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("No action given")]
@@ -24,6 +27,12 @@ pub enum Error {
     #[error("Bad argument at position:{0} {1}")]
     BadArgument(usize, String),
 
-    #[error("Parse error")]
-    WinnowParseError,
+    #[error("Parse error: {0}")]
+    ParseError(winnow::error::ErrMode<winnow::error::ContextError>),
+}
+
+impl From<winnow::error::ErrMode<winnow::error::ContextError>> for Error {
+    fn from(e: winnow::error::ErrMode<winnow::error::ContextError>) -> Self {
+        Error::ParseError(e)
+    }
 }

@@ -1,8 +1,6 @@
-use crate::actions;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use std::collections::HashMap;
-use syn::{parse_macro_input, DeriveInput, Fields};
+use syn::{DeriveInput, Fields};
 
 #[derive(Debug)]
 struct Action {
@@ -110,30 +108,7 @@ fn generate(action: &Action) -> TokenStream {
 
     match &action.args {
         Args::Enum(variants) => {
-            tokens.push(quote! {
-                let _enum = 1;
-            });
-
-            // We need to parse this "command" (or subcommand).
-            tokens.push(quote! {});
-
-            for variant in variants {
-                let variant_ident = &variant.ident;
-                let variant_name = variant_ident.to_string();
-                let fields = &variant.fields;
-
-                tokens.push(quote! {
-                    let _variant = #variant_name;
-                });
-
-                for field in fields {
-                    tokens.push(quote! {
-                        let _field = 1;
-                        let _field = #field;
-                        let x = #field::resolve(s);
-                    });
-                }
-            }
+            generate_enum(&mut tokens, action, variants);
         }
         x => {
             let x = format!("{:?}", x);
@@ -144,24 +119,71 @@ fn generate(action: &Action) -> TokenStream {
         }
     };
 
-    dbg!(&tokens);
-
     quote! {
         impl ::slowchop_console::ActionsHandler for #action_ident {
-            fn resolve(s: &mut str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
+            fn resolve(s: &mut &str) -> ::std::result::Result<Self, ::slowchop_console::Error> {
 
                 let start = 1;
 
                 #(#tokens)*
-
-
-                // just to test the macro... i want to access the first enum ident
-
-                // #ident::resolve(s)
 
                 let end = 1;
                 todo!()
             }
         }
     }
+}
+
+fn generate_enum(tokens: &mut Vec<TokenStream>, action: &Action, variants: &[EnumVariant]) {
+    tokens.push(quote! {
+        let _enum = 1;
+    });
+
+    // We need to parse this "command" (or subcommand).
+    tokens.push(quote! {
+        let action = ::slowchop_console::parse::action(s)?;
+        println!("action: {:?}", action);
+    });
+
+    let mut inner_tokens = Vec::new();
+    for variant in variants {
+        let variant_tokens = generate_enum_variant(action, variant);
+        inner_tokens.extend(variant_tokens);
+    }
+
+    tokens.push(quote! {
+        match action {
+            #(#inner_tokens)*
+            _ => {
+                return Err(::slowchop_console::Error::UnknownAction);
+            }
+        };
+    });
+}
+
+fn generate_enum_variant(action: &Action, variant: &EnumVariant) -> Vec<TokenStream> {
+    let mut tokens = Vec::new();
+
+    let variant_ident = &variant.ident;
+    let variant_name = variant_ident.to_string();
+    let fields = &variant.fields;
+
+    tokens.push(quote! {
+        #variant_name => {
+            let _variant = 1;
+        }
+    });
+
+    // for field in fields {
+    //     let field = field.to_string();
+    //     tokens.push(quote! {
+    //         #variant_name => {
+    //             let _field = #field;
+    //             // let _field = #field;
+    //             // let x = #field::resolve(s);
+    //         }
+    //     });
+    // }
+
+    tokens
 }

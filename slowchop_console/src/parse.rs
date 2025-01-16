@@ -6,7 +6,7 @@ use winnow::{PResult, Parser};
 
 /// Parse an action from the input string, moving forward the input string's pointer, to past the
 /// next whitespace.
-fn parse_action<'s>(s: &mut &'s str) -> PResult<&'s str> {
+pub fn action<'s>(s: &mut &'s str) -> PResult<&'s str> {
     terminated(alphanumeric1, space0).parse_next(s)
 }
 
@@ -19,7 +19,7 @@ fn parse_action<'s>(s: &mut &'s str) -> PResult<&'s str> {
 /// * "hello world" -> hello
 /// * "hello \"world\"" -> hello "world"
 /// * 'hello "world"' -> hello "world"
-fn parse_string(s: &mut &str) -> PResult<String> {
+fn string(s: &mut &str) -> PResult<String> {
     terminated(
         alt((
             //
@@ -95,7 +95,7 @@ mod tests {
 
         for (mut s, expected_action, expected_remaining) in test_cases {
             let s = &mut s;
-            assert_eq!(parse_action.parse_next(s), expected_action);
+            assert_eq!(action.parse_next(s), expected_action);
             assert_eq!(*s, expected_remaining);
         }
     }
@@ -118,7 +118,7 @@ mod tests {
         for fixture in test_cases {
             let (s, expected, new_pointer, ok) = &fixture;
             let mut s = *s;
-            let r = parse_string.parse_next(&mut s);
+            let r = string.parse_next(&mut s);
             if *ok {
                 assert_eq!(r, Ok(expected.to_string()), "fixture: {:?}", fixture);
             } else {

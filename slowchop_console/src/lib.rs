@@ -40,7 +40,7 @@
 //! Check out the [full example](examples/full.rs) on how to integrate.
 
 mod error;
-mod parse;
+pub mod parse;
 mod plugin;
 mod subscriber;
 
@@ -57,7 +57,7 @@ pub trait ActionsHandlerOld {
 }
 
 pub trait ActionsHandler {
-    fn resolve(text: &mut str) -> Result<Self, Error>
+    fn resolve(text: &mut &str) -> Result<Self, Error>
     where
         Self: Sized;
 }

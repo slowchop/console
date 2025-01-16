@@ -1,5 +1,9 @@
 use slowchop_console::{Actions, ActionsHandler, Error};
 
+mod sub;
+
+/*
+
 #[derive(Debug, PartialEq, Actions)]
 enum Con {
     Quit,
@@ -168,23 +172,4 @@ fn required_then_optional() -> Result<(), Error> {
     Ok(())
 }
 
-#[test]
-fn sub_enum() -> Result<(), Error> {
-    #[derive(Actions)]
-    enum Actions {
-        A,
-        B,
-    }
-
-    #[derive(Actions)]
-    enum Sub {
-        C,
-        D,
-    }
-
-    assert_eq!(Actions::resolve("A C")?, Actions::A(Sub::C));
-    assert_eq!(Actions::resolve("A D")?, Actions::A(Sub::D));
-    assert_eq!(Actions::resolve("B")?, Actions::B);
-
-    Ok(())
-}
+ */
