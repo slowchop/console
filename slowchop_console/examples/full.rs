@@ -16,6 +16,7 @@ pub fn main() {
         app.world_mut().register_system(
             |args: In<FunctionArgs>, mut app_exit: EventWriter<AppExit>| {
                 info!("Quitting the application.");
+                info!("got some args though: {:?}", args);
                 app_exit.send(AppExit::Success);
             },
         ),

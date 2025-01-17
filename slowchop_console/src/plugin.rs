@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy::window::PrimaryWindow;
 use rune::Value;
+use shlex::Shlex;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
@@ -106,7 +107,19 @@ impl Console {
     }
 
     pub fn run_system_command_in_commands(&self, commands: &mut Commands, command: &str) {
-        println!("Running system command: {}", command);
+        let s: Vec<_> = Shlex::new(command).collect();
+        let Some(command) = s.first() else {
+            return;
+        };
+
+        let args = FunctionArgs {
+            args: s
+                .iter()
+                .skip(1)
+                .map(|x| SaneValue::String(x.to_string()))
+                .collect(),
+        };
+
         let system = match self.functions.get(command) {
             Some(Function::Native(system)) => system,
             _ => {
@@ -114,8 +127,6 @@ impl Console {
                 return;
             }
         };
-
-        let args = FunctionArgs { args: vec![] };
 
         commands.run_system_with_input(*system, args);
     }
@@ -151,12 +162,15 @@ impl Default for Console {
     }
 }
 
+#[derive(Debug)]
 pub struct FunctionArgs {
     pub args: Vec<SaneValue>,
 }
 
+#[derive(Debug)]
 pub enum SaneValue {
     Bool(bool),
+    String(String),
     Integer(i64),
 }
 
@@ -438,13 +452,6 @@ fn handle_submitted_text(
 ) {
     for text in submitted_text_reader.read() {
         info!("> {}", &**text);
-
-        // let Some(system_id) = console.functions.get(&**text) else {
-        //     error!("No system found with the name: {}", &**text);
-        //     return;
-        // };
-
-        // let args = FunctionArgs { args: vec![] };
 
         console.run_system_command_in_commands(&mut commands, &**text);
     }
