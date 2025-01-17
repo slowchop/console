@@ -43,12 +43,12 @@ mod error;
 mod plugin;
 mod subscriber;
 
+pub use crate::plugin::FunctionArgs;
 pub use crate::subscriber::slowchop_log_layer;
 pub use error::Error;
 pub use plugin::{Console, ConsolePlugin};
 pub use shlex;
 pub use slowchop_console_derive::Actions;
-
 /// The trait that is derived by the `Actions` derive macro.
 pub trait ActionsHandler {
     fn resolve(text: &str) -> Result<Self, Error>

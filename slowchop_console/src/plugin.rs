@@ -1,11 +1,12 @@
 use crate::subscriber::LogEvent;
-use crate::ActionsHandler;
+use bevy::ecs::system::SystemId;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::input::ButtonState;
 use bevy::log::Level;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy::window::PrimaryWindow;
+use rune::Value;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 
@@ -15,7 +16,7 @@ struct EntityEntry {
 }
 
 pub enum Function {
-    Native(Box<dyn Fn(&str) -> Result<(), rune::Value> + Send + Sync + 'static>),
+    Native(SystemId<In<FunctionArgs>>),
     Script(String),
 }
 
@@ -83,6 +84,41 @@ impl Console {
         self.open = !self.open;
         self.console_did_toggle = true;
     }
+
+    pub fn add_system_command(&mut self, name: &str, system: SystemId<In<FunctionArgs>>) {
+        self.functions
+            .insert(name.to_string(), Function::Native(system));
+    }
+
+    pub fn run_system_command_in_world(&self, world: &mut World, command: &str) {
+        println!("Running system command: {}", command);
+        let system = match self.functions.get(command) {
+            Some(Function::Native(system)) => system,
+            _ => {
+                error!("No system found with the name: {}", command);
+                return;
+            }
+        };
+
+        let args = FunctionArgs { args: vec![] };
+
+        world.run_system_with_input(*system, args).unwrap();
+    }
+
+    pub fn run_system_command_in_commands(&self, commands: &mut Commands, command: &str) {
+        println!("Running system command: {}", command);
+        let system = match self.functions.get(command) {
+            Some(Function::Native(system)) => system,
+            _ => {
+                error!("No system found with the name: {}", command);
+                return;
+            }
+        };
+
+        let args = FunctionArgs { args: vec![] };
+
+        commands.run_system_with_input(*system, args);
+    }
 }
 
 impl Default for Console {
@@ -113,6 +149,15 @@ impl Default for Console {
             trace_text_color: Srgba::hex("#445055").unwrap().into(),
         }
     }
+}
+
+pub struct FunctionArgs {
+    pub args: Vec<SaneValue>,
+}
+
+pub enum SaneValue {
+    Bool(bool),
+    Integer(i64),
 }
 
 #[derive(Clone, Debug, Default)]
@@ -386,19 +431,21 @@ fn update_visibility(mut console: ResMut<Console>, mut query: Query<&mut Visibil
 }
 
 fn handle_submitted_text(
+    mut commands: Commands,
+    console: Res<Console>,
     mut submitted_text_reader: EventReader<SubmittedText>,
     // mut actions_writer: EventWriter<A>,
 ) {
-    warn!("TODOooooooooo");
-    // for text in submitted_text_reader.read() {
-    //     info!("> {}", &**text);
-    //     match A::resolve(&text.0) {
-    //         Ok(action) => {
-    //             actions_writer.send(action);
-    //         }
-    //         Err(e) => {
-    //             error!("{e:#?}");
-    //         }
-    //     }
-    // }
+    for text in submitted_text_reader.read() {
+        info!("> {}", &**text);
+
+        // let Some(system_id) = console.functions.get(&**text) else {
+        //     error!("No system found with the name: {}", &**text);
+        //     return;
+        // };
+
+        // let args = FunctionArgs { args: vec![] };
+
+        console.run_system_command_in_commands(&mut commands, &**text);
+    }
 }
