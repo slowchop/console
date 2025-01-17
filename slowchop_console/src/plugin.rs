@@ -4,6 +4,7 @@ use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::input::ButtonState;
 use bevy::log::Level;
 use bevy::prelude::*;
+use bevy::utils::HashMap;
 use bevy::window::PrimaryWindow;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -13,8 +14,15 @@ struct EntityEntry {
     entity: Entity,
 }
 
-#[derive(Resource, Debug)]
-pub struct Console<A> {
+pub enum Function {
+    Native(Box<dyn Fn(&str) -> Result<(), rune::Value> + Send + Sync + 'static>),
+    Script(String),
+}
+
+#[derive(Resource)]
+pub struct Console {
+    functions: HashMap<String, Function>,
+
     input: String,
 
     pub max_lines: usize,
@@ -58,10 +66,9 @@ pub struct Console<A> {
     input_did_update: bool,
 
     entity_entries: VecDeque<EntityEntry>,
-    phantom_data: std::marker::PhantomData<A>,
 }
 
-impl<A> Console<A> {
+impl Console {
     pub fn open(&mut self) {
         self.open = true;
         self.console_did_toggle = true;
@@ -78,10 +85,11 @@ impl<A> Console<A> {
     }
 }
 
-impl<A> Default for Console<A> {
+impl Default for Console {
     fn default() -> Self {
         Console {
             input: "".to_string(),
+            functions: HashMap::default(),
             toggle_key_code: Some(KeyCode::Backquote),
             close_key_code: Some(KeyCode::Escape),
             open_key_code: None,
@@ -93,7 +101,6 @@ impl<A> Default for Console<A> {
             expand_fraction: 0.8,
             input_did_update: true,
             console_did_toggle: true,
-            phantom_data: Default::default(),
             z_index: 100,
 
             background_color: Srgba::hex("#0E181A").unwrap().into(),
@@ -108,52 +115,32 @@ impl<A> Default for Console<A> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ConsolePlugin<A>
-where
-    A: Send + Sync + 'static,
-{
-    phantom_data: std::marker::PhantomData<A>,
-}
+#[derive(Clone, Debug, Default)]
+pub struct ConsolePlugin;
 
-impl<A> Default for ConsolePlugin<A>
-where
-    A: Send + Sync + 'static,
-{
-    fn default() -> Self {
-        Self {
-            phantom_data: Default::default(),
-        }
-    }
-}
-
-impl<A> Plugin for ConsolePlugin<A>
-where
-    A: ActionsHandler + Debug + Event + Send + Sync + 'static,
-{
+impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Console<A>>();
-        app.add_event::<A>();
+        app.init_resource::<Console>();
         app.add_event::<SubmittedText>();
-        app.add_systems(Startup, setup_console::<A>);
+        app.add_systems(Startup, setup_console);
         app.add_systems(
             Update,
             (
-                update_history::<A>,
+                update_history,
                 (
-                    reset_did_close_flag::<A>,
-                    close_shortcuts::<A>.run_if(|console: Res<Console<A>>| console.open),
+                    reset_did_close_flag,
+                    close_shortcuts.run_if(|console: Res<Console>| console.open),
                     (
-                        get_keyboard_input::<A>,
-                        update_input_text::<A>.run_if(needs_update::<A>),
-                        handle_submitted_text::<A>,
+                        get_keyboard_input,
+                        update_input_text.run_if(needs_update),
+                        handle_submitted_text,
                     )
                         .chain()
-                        .run_if(|console: Res<Console<A>>| console.open),
-                    open_shortcuts::<A>.run_if(|console: Res<Console<A>>| {
+                        .run_if(|console: Res<Console>| console.open),
+                    open_shortcuts.run_if(|console: Res<Console>| {
                         !console.open && !console.did_close_this_frame
                     }),
-                    update_visibility::<A>,
+                    update_visibility,
                 )
                     .chain(),
             ),
@@ -170,13 +157,11 @@ struct History;
 #[derive(Component)]
 pub(crate) struct InputText;
 
-fn setup_console<A>(
+fn setup_console(
     mut commands: Commands,
-    console: Res<Console<A>>,
+    console: Res<Console>,
     window: Query<&Window, With<PrimaryWindow>>,
-) where
-    A: Send + Sync + 'static,
-{
+) {
     let Ok(window) = window.get_single() else {
         return;
     };
@@ -243,38 +228,27 @@ fn setup_console<A>(
     });
 }
 
-fn needs_update<A>(console: Res<Console<A>>) -> bool
+fn needs_update(console: Res<Console>) -> bool
 where
-    A: Send + Sync + 'static,
 {
     console.input_did_update
 }
 
-fn update_input_text<A>(
-    mut console: ResMut<Console<A>>,
+fn update_input_text(
+    mut console: ResMut<Console>,
     mut text_query: Query<&mut Text, With<InputText>>,
-) where
-    A: Send + Sync + 'static,
-{
+) {
     console.input_did_update = false;
     let mut text = text_query.single_mut();
     **text = console.input.clone();
 }
 
-fn update_history<A>(
+fn update_history(
     mut commands: Commands,
-    mut console: ResMut<Console<A>>,
+    mut console: ResMut<Console>,
     mut history_query: Query<Entity, With<History>>,
     mut log_events: EventReader<LogEvent>,
-) where
-    A: Send + Sync + 'static,
-{
-    // Mutex lock and remove all items from queued vec.
-    // let new_entries = console.take_queued_entries();
-    // if new_entries.is_empty() {
-    //     return;
-    // }
-
+) {
     let history = history_query.single_mut();
 
     // For each new item, spawn a new entity with a Text component and add it to the children of the
@@ -321,13 +295,11 @@ fn update_history<A>(
 #[derive(Event, Debug, Deref)]
 struct SubmittedText(String);
 
-fn get_keyboard_input<A>(
-    mut console: ResMut<Console<A>>,
+fn get_keyboard_input(
+    mut console: ResMut<Console>,
     mut key_events: EventReader<KeyboardInput>,
     mut submitted_text_writer: EventWriter<SubmittedText>,
-) where
-    A: Send + Sync + 'static,
-{
+) {
     for key in key_events.read() {
         if key.state == ButtonState::Released {
             continue;
@@ -354,18 +326,12 @@ fn get_keyboard_input<A>(
     }
 }
 
-fn reset_did_close_flag<A>(mut console: ResMut<Console<A>>)
-where
-    A: Send + Sync + 'static,
-{
+fn reset_did_close_flag(mut console: ResMut<Console>) {
     console.did_close_this_frame = false;
 }
 
 /// Run this before handling keyboard to close the console if it is open.
-fn close_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<ButtonInput<KeyCode>>)
-where
-    A: Send + Sync + 'static,
-{
+fn close_shortcuts(mut console: ResMut<Console>, keyboard_input: Res<ButtonInput<KeyCode>>) {
     let mut to_close = false;
 
     if let Some(key_code) = console.toggle_key_code {
@@ -387,10 +353,7 @@ where
 }
 
 /// Run this after handling keyboard to open the console if it is closed.
-fn open_shortcuts<A>(mut console: ResMut<Console<A>>, keyboard_input: Res<ButtonInput<KeyCode>>)
-where
-    A: Send + Sync + 'static,
-{
+fn open_shortcuts(mut console: ResMut<Console>, keyboard_input: Res<ButtonInput<KeyCode>>) {
     let mut to_open = false;
 
     if let Some(key_code) = console.toggle_key_code {
@@ -410,12 +373,7 @@ where
     }
 }
 
-fn update_visibility<A>(
-    mut console: ResMut<Console<A>>,
-    mut query: Query<&mut Visibility, With<Root>>,
-) where
-    A: Send + Sync + 'static,
-{
+fn update_visibility(mut console: ResMut<Console>, mut query: Query<&mut Visibility, With<Root>>) {
     if console.console_did_toggle {
         let mut visibility = query.single_mut();
         if console.open {
@@ -427,21 +385,20 @@ fn update_visibility<A>(
     }
 }
 
-fn handle_submitted_text<A>(
+fn handle_submitted_text(
     mut submitted_text_reader: EventReader<SubmittedText>,
-    mut actions_writer: EventWriter<A>,
-) where
-    A: ActionsHandler + Event + Debug + Send + Sync + 'static,
-{
-    for text in submitted_text_reader.read() {
-        info!("> {}", &**text);
-        match A::resolve(&text.0) {
-            Ok(action) => {
-                actions_writer.send(action);
-            }
-            Err(e) => {
-                error!("{e:#?}");
-            }
-        }
-    }
+    // mut actions_writer: EventWriter<A>,
+) {
+    warn!("TODOooooooooo");
+    // for text in submitted_text_reader.read() {
+    //     info!("> {}", &**text);
+    //     match A::resolve(&text.0) {
+    //         Ok(action) => {
+    //             actions_writer.send(action);
+    //         }
+    //         Err(e) => {
+    //             error!("{e:#?}");
+    //         }
+    //     }
+    // }
 }

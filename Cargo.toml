@@ -5,13 +5,14 @@ members = ["slowchop_console", "slowchop_console_derive"]
 
 [workspace.dependencies]
 slowchop_console_derive = { version = "0.1.2", path = "slowchop_console_derive" }
+slowchop_scripting = { path = "../grabby_aliens/slowchop_scripting" }
 
+bevy = { version = "0.15.1", default-features = false, features = ["bevy_ui"] }
+
+rune = "0.13"
 shlex = "1.3.0"
 thiserror = "1.0.50"
 tracing-subscriber = { version = "0.3.18" }
-once_cell = "1.19.0"
 proc-macro2 = "1.0.70"
 quote = "1.0.33"
 syn = { version = "2.0.39", features = ["extra-traits"] }
-
-bevy = { version = "0.15.1", default-features = false, features = ["bevy_ui"] }

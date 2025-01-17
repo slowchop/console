@@ -15,7 +15,7 @@ slowchop_console_derive = { workspace = true }
 shlex = { workspace = true }
 thiserror = { workspace = true }
 tracing-subscriber = { workspace = true }
-once_cell = { workspace = true }
+rune = { workspace = true }
 
 [dev-dependencies]
 
