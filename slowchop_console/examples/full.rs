@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use slowchop_console::{Actions, Console, ConsolePlugin};
+use slowchop_console::{slowchop_log_layer, Actions, Console, ConsolePlugin};
 
 #[derive(Actions, Clone, Debug, Event)]
 enum MyGameActions {
@@ -19,17 +19,14 @@ enum MyGameActions {
 }
 
 pub fn main() {
-    let default_filter =
-        "trace,slowchop_console=info,wgpu=error,naga=warn,bevy=info,winit=info,gilrs=info"
-            .to_string();
+    let default_filter = "info,full=trace".to_string();
     std::env::set_var("RUST_LOG", default_filter);
-
     let console_plugin = ConsolePlugin::<MyGameActions>::default();
 
     App::new()
         .add_plugins((
             DefaultPlugins.set(bevy::log::LogPlugin {
-                update_subscriber: Some(console_plugin.update_subscriber()),
+                custom_layer: slowchop_log_layer,
                 ..default()
             }),
             console_plugin,
@@ -41,7 +38,8 @@ pub fn main() {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(Camera2dBundle::default());
+    // commands.spawn(Camera2dBundle::default());
+    commands.spawn(Camera2d);
 }
 
 fn start_with_console_open(mut console: ResMut<Console<MyGameActions>>) {

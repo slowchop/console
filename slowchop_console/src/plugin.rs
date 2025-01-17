@@ -1,34 +1,16 @@
+use crate::subscriber::LogEvent;
 use crate::ActionsHandler;
-use bevy::log::{BoxedSubscriber, Level};
+use bevy::input::keyboard::{Key, KeyboardInput};
+use bevy::input::ButtonState;
+use bevy::log::Level;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use once_cell::sync::Lazy;
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::sync::Mutex;
-use tracing_subscriber::layer::SubscriberExt;
-
-/// Unable to work out how to pass in an instance to LogPlugin update_subscriber, so using a global
-/// static to give access to all QueuedEntries instances.
-pub static QUEUED_ENTRIES: Lazy<QueuedEntries> = Lazy::new(QueuedEntries::default);
-
-/// A container for entries that are queued up to be added to the console.
-///
-/// This was created specifically to use with the tracing subscriber.
-#[derive(Debug, Default)]
-pub struct QueuedEntries(pub(crate) Mutex<Vec<Entry>>);
 
 #[derive(Debug)]
 struct EntityEntry {
     entity: Entity,
-    // entry: Entry,
-}
-
-#[derive(Debug)]
-pub(crate) struct Entry {
-    // pub(crate) when: Instant, // TODO: Use this to show the time of the entry, or fade out old entries.
-    pub(crate) level: Level,
-    pub(crate) message: String,
 }
 
 #[derive(Resource, Debug)]
@@ -94,11 +76,6 @@ impl<A> Console<A> {
         self.open = !self.open;
         self.console_did_toggle = true;
     }
-
-    fn take_queued_entries(&self) -> Vec<Entry> {
-        let mut entries = QUEUED_ENTRIES.0.lock().unwrap();
-        entries.drain(..).collect()
-    }
 }
 
 impl<A> Default for Console<A> {
@@ -119,14 +96,14 @@ impl<A> Default for Console<A> {
             phantom_data: Default::default(),
             z_index: 100,
 
-            background_color: Color::hex("#0E181A").unwrap(),
-            input_background_color: Color::hex("445055").unwrap(),
+            background_color: Srgba::hex("#0E181A").unwrap().into(),
+            input_background_color: Srgba::hex("#445055").unwrap().into(),
             input_text_color: Color::WHITE,
-            error_text_color: Color::hex("FD564C").unwrap(),
-            warn_text_color: Color::hex("FFE76A").unwrap(),
-            info_text_color: Color::hex("81C6DC").unwrap(),
-            debug_text_color: Color::hex("838A83").unwrap(),
-            trace_text_color: Color::hex("445055").unwrap(),
+            error_text_color: Srgba::hex("#FD564C").unwrap().into(),
+            warn_text_color: Srgba::hex("#FFE76A").unwrap().into(),
+            info_text_color: Srgba::hex("#81C6DC").unwrap().into(),
+            debug_text_color: Srgba::hex("#838A83").unwrap().into(),
+            trace_text_color: Srgba::hex("#445055").unwrap().into(),
         }
     }
 }
@@ -137,15 +114,6 @@ where
     A: Send + Sync + 'static,
 {
     phantom_data: std::marker::PhantomData<A>,
-}
-
-impl<A> ConsolePlugin<A>
-where
-    A: Send + Sync + ActionsHandler + Debug,
-{
-    pub fn update_subscriber(&self) -> fn(BoxedSubscriber) -> BoxedSubscriber {
-        |subscriber| Box::new(subscriber.with(ConsolePlugin::<A>::default()))
-    }
 }
 
 impl<A> Default for ConsolePlugin<A>
@@ -216,73 +184,59 @@ fn setup_console<A>(
     let mut group = commands.spawn((
         Name::new("Console"),
         Root,
-        NodeBundle {
-            visibility: Visibility::Hidden,
-            z_index: ZIndex::Global(console.z_index),
-            style: Style {
-                padding: UiRect::all(Val::Px(0.)),
-                margin: UiRect::all(Val::Px(0.)),
-                width: Val::Percent(100.),
-                height: Val::Px(window.resolution.height() * console.expand_fraction),
-                flex_direction: FlexDirection::ColumnReverse,
-                ..default()
-            },
-            background_color: console.background_color.into(),
+        Node {
+            padding: UiRect::all(Val::Px(0.)),
+            margin: UiRect::all(Val::Px(0.)),
+            width: Val::Percent(100.),
+            height: Val::Px(window.resolution.height() * console.expand_fraction),
+            flex_direction: FlexDirection::ColumnReverse,
             ..default()
         },
+        Visibility::Hidden,
+        GlobalZIndex(console.z_index),
+        BackgroundColor(console.background_color.into()),
     ));
 
     group.with_children(|parent| {
         parent
             .spawn((
                 Name::new("Input Container"),
-                NodeBundle {
-                    background_color: console.input_background_color.into(),
-                    style: Style {
-                        flex_grow: 0.,
-                        padding: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(2.), Val::Px(2.)),
-                        margin: UiRect::top(Val::Px(7.)),
-                        ..default()
-                    },
+                Node {
+                    flex_grow: 0.,
+                    padding: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(2.), Val::Px(2.)),
+                    margin: UiRect::top(Val::Px(7.)),
                     ..default()
                 },
+                BackgroundColor(console.input_background_color.into()),
             ))
             .with_children(|parent| {
                 parent.spawn((
                     Name::new("Input"),
                     InputText,
-                    TextBundle {
-                        style: Style {
-                            min_height: Val::Px(console.font_size),
-                            flex_grow: 0.,
-                            padding: UiRect::all(Val::Px(0.)),
-                            margin: UiRect::all(Val::Px(0.)),
-                            ..default()
-                        },
-                        text: Text::from_section(
-                            "",
-                            TextStyle {
-                                color: console.input_text_color,
-                                font_size: console.font_size,
-                                ..default()
-                            },
-                        ),
-                        transform: Transform::from_translation(Vec3::new(0., 0., 0.)),
+                    Node {
+                        min_height: Val::Px(console.font_size),
+                        flex_grow: 0.,
+                        padding: UiRect::all(Val::Px(0.)),
+                        margin: UiRect::all(Val::Px(0.)),
                         ..default()
                     },
+                    Text::new(""),
+                    TextFont {
+                        font_size: console.font_size,
+                        ..default()
+                    },
+                    TextColor(console.input_text_color),
+                    Transform::from_translation(Vec3::new(0., 0., 0.)),
                 ));
             });
 
         parent.spawn((
             Name::new("History"),
             History,
-            NodeBundle {
-                style: Style {
-                    overflow: Overflow::clip_y(),
-                    flex_direction: FlexDirection::Column,
-                    align_content: AlignContent::FlexStart,
-                    ..default()
-                },
+            Node {
+                overflow: Overflow::clip_y(),
+                flex_direction: FlexDirection::Column,
+                align_content: AlignContent::FlexStart,
                 ..default()
             },
         ));
@@ -304,29 +258,29 @@ fn update_input_text<A>(
 {
     console.input_did_update = false;
     let mut text = text_query.single_mut();
-    text.sections[0].value = console.input.clone();
+    **text = console.input.clone();
 }
 
 fn update_history<A>(
     mut commands: Commands,
     mut console: ResMut<Console<A>>,
     mut history_query: Query<Entity, With<History>>,
+    mut log_events: EventReader<LogEvent>,
 ) where
     A: Send + Sync + 'static,
 {
     // Mutex lock and remove all items from queued vec.
-    let new_entries = console.take_queued_entries();
-
-    if new_entries.is_empty() {
-        return;
-    }
+    // let new_entries = console.take_queued_entries();
+    // if new_entries.is_empty() {
+    //     return;
+    // }
 
     let history = history_query.single_mut();
 
     // For each new item, spawn a new entity with a Text component and add it to the children of the
     // history node.
-    for entry in new_entries {
-        let color = match entry.level {
+    for log_event in log_events.read() {
+        let color = match log_event.level {
             Level::TRACE => console.trace_text_color,
             Level::DEBUG => console.debug_text_color,
             Level::INFO => console.info_text_color,
@@ -337,25 +291,20 @@ fn update_history<A>(
         let entity = commands
             .spawn((
                 Name::new("HistoryItem"),
-                TextBundle {
-                    text: Text::from_section(
-                        &entry.message,
-                        TextStyle {
-                            color,
-                            font_size: console.font_size,
-                            ..default()
-                        },
-                    ),
-                    style: Style {
-                        margin: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(0.), Val::Px(0.)),
-                        ..default()
-                    },
+                Text::new(&log_event.message),
+                TextFont {
+                    font_size: console.font_size,
+                    ..default()
+                },
+                TextColor(color),
+                Node {
+                    margin: UiRect::new(Val::Px(10.), Val::Px(10.), Val::Px(0.), Val::Px(0.)),
                     ..default()
                 },
             ))
             .id();
 
-        commands.entity(history).push_children(&[entity]);
+        commands.entity(history).add_children(&[entity]);
 
         console.entity_entries.push_back(EntityEntry { entity });
     }
@@ -374,26 +323,31 @@ struct SubmittedText(String);
 
 fn get_keyboard_input<A>(
     mut console: ResMut<Console<A>>,
-    mut key_events: EventReader<ReceivedCharacter>,
+    mut key_events: EventReader<KeyboardInput>,
     mut submitted_text_writer: EventWriter<SubmittedText>,
 ) where
     A: Send + Sync + 'static,
 {
     for key in key_events.read() {
-        trace!(?key);
-        match key.char.as_str() {
-            // Enter
-            "\r" => {
+        if key.state == ButtonState::Released {
+            continue;
+        }
+
+        match &key.logical_key {
+            Key::Enter => {
                 submitted_text_writer.send(SubmittedText(console.input.clone()));
                 console.input.clear();
             }
-            // Backspace
-            "\u{7F}" | "\u{8}" => {
+            Key::Backspace => {
                 console.input.pop();
             }
-            _ => {
-                console.input += &key.char.to_string();
+            Key::Space => {
+                console.input += " ";
             }
+            Key::Character(c) => {
+                console.input += &c.to_string();
+            }
+            _ => {}
         }
 
         console.input_did_update = true;

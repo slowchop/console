@@ -43,6 +43,7 @@ mod error;
 mod plugin;
 mod subscriber;
 
+pub use crate::subscriber::slowchop_log_layer;
 pub use error::Error;
 pub use plugin::{Console, ConsolePlugin};
 pub use shlex;
