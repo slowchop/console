@@ -41,6 +41,7 @@
 
 mod error;
 mod plugin;
+mod render;
 mod subscriber;
 
 pub use crate::plugin::FunctionArgs;
