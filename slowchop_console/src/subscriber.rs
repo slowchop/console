@@ -8,13 +8,9 @@ use bevy::utils::tracing::{self, Subscriber};
 
 pub fn slowchop_log_layer(app: &mut App) -> Option<BoxedLayer> {
     let (sender, receiver) = mpsc::channel();
-
-    let layer = CaptureLayer { sender };
     let resource = CapturedLogEvents(receiver);
-
     app.insert_non_send_resource(resource);
-    app.add_event::<LogEvent>();
-    app.add_systems(Update, transfer_log_events);
+    let layer = CaptureLayer { sender };
 
     Some(layer.boxed())
 }
@@ -29,10 +25,10 @@ pub(crate) struct LogEvent {
 /// This non-send resource temporarily stores [`LogEvent`]s before they are
 /// written to [`Events<LogEvent>`] by [`transfer_log_events`].
 #[derive(Deref, DerefMut)]
-struct CapturedLogEvents(mpsc::Receiver<LogEvent>);
+pub(crate) struct CapturedLogEvents(mpsc::Receiver<LogEvent>);
 
 /// Transfers information from the `LogEvents` resource to [`Events<LogEvent>`](LogEvent).
-fn transfer_log_events(
+pub(crate) fn transfer_log_events(
     receiver: NonSend<CapturedLogEvents>,
     mut log_events: EventWriter<LogEvent>,
 ) {

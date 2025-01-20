@@ -1,5 +1,5 @@
 use crate::render::{self, update_history, InputText, Root};
-use crate::subscriber::LogEvent;
+use crate::subscriber::{transfer_log_events, LogEvent};
 use bevy::ecs::system::SystemId;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::input::ButtonState;
@@ -181,12 +181,14 @@ pub struct ConsolePlugin;
 impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Console>();
+        app.add_event::<LogEvent>();
         app.add_event::<SubmittedText>();
         app.add_systems(Startup, render::setup_console);
         app.add_systems(
             Update,
             (
                 update_history,
+                transfer_log_events,
                 (
                     reset_did_close_flag,
                     close_shortcuts.run_if(|console: Res<Console>| console.open),
