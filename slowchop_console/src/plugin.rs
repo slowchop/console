@@ -53,9 +53,6 @@ pub struct Console {
     /// use open(), toggle() or close() to change this.
     open: bool,
 
-    /// To stop the toggle from opening and closing the console on the same frame.
-    did_close_this_frame: bool,
-
     /// How far down the console will expand to, as a percentage of the screen height.
     /// 1.0 for expanding all the way down to the bottom. 0.5 for half way.
     pub expand_fraction: f32,
@@ -145,7 +142,6 @@ impl Default for Console {
             max_lines: 100,
             font_size: 16.0,
             open: false,
-            did_close_this_frame: false,
             expand_fraction: 0.8,
             input_did_update: true,
             console_did_toggle: true,
@@ -190,19 +186,15 @@ impl Plugin for ConsolePlugin {
                 update_history,
                 transfer_log_events,
                 (
-                    reset_did_close_flag,
-                    close_shortcuts.run_if(|console: Res<Console>| console.open),
                     (
-                        get_keyboard_input,
                         update_input_text.run_if(needs_update),
+                        get_keyboard_input,
                         handle_submitted_text,
                     )
                         .chain()
                         .run_if(|console: Res<Console>| console.open),
-                    open_shortcuts.run_if(|console: Res<Console>| {
-                        !console.open && !console.did_close_this_frame
-                    }),
                     update_visibility,
+                    handle_keyboard_shortcuts,
                 )
                     .chain(),
             ),
@@ -249,6 +241,9 @@ fn get_keyboard_input(
             Key::Space => {
                 console.input += " ";
             }
+            Key::Character(c) if c.as_str() == "`" => {
+                warn_once!("Skipping backtick key for input for now. Programming is hard.");
+            }
             Key::Character(c) => {
                 console.input += &c.to_string();
             }
@@ -259,50 +254,35 @@ fn get_keyboard_input(
     }
 }
 
-fn reset_did_close_flag(mut console: ResMut<Console>) {
-    console.did_close_this_frame = false;
-}
-
 /// Run this before handling keyboard to close the console if it is open.
-fn close_shortcuts(mut console: ResMut<Console>, keyboard_input: Res<ButtonInput<KeyCode>>) {
-    let mut to_close = false;
-
+fn handle_keyboard_shortcuts(
+    mut console: ResMut<Console>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+) {
     if let Some(key_code) = console.toggle_key_code {
         if keyboard_input.just_pressed(key_code) {
-            to_close = true;
+            if console.open {
+                console.close();
+                return;
+            } else {
+                console.open();
+                return;
+            }
         }
     }
 
     if let Some(key_code) = console.close_key_code {
         if keyboard_input.just_pressed(key_code) {
-            to_close = true;
-        }
-    }
-
-    if to_close {
-        console.close();
-        console.did_close_this_frame = true;
-    }
-}
-
-/// Run this after handling keyboard to open the console if it is closed.
-fn open_shortcuts(mut console: ResMut<Console>, keyboard_input: Res<ButtonInput<KeyCode>>) {
-    let mut to_open = false;
-
-    if let Some(key_code) = console.toggle_key_code {
-        if keyboard_input.just_pressed(key_code) {
-            to_open = true;
+            console.close();
+            return;
         }
     }
 
     if let Some(key_code) = console.open_key_code {
         if keyboard_input.just_pressed(key_code) {
-            to_open = true;
+            console.open();
+            return;
         }
-    }
-
-    if to_open {
-        console.open();
     }
 }
 
