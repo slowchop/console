@@ -3,11 +3,8 @@ use crate::subscriber::{transfer_log_events, LogEvent};
 use bevy::ecs::system::SystemId;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::input::ButtonState;
-use bevy::log::Level;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-use bevy::window::PrimaryWindow;
-use rune::Value;
 use shlex::Shlex;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -66,6 +63,12 @@ pub struct Console {
     input_did_update: bool,
 
     pub(crate) entity_entries: VecDeque<EntityEntry>,
+}
+
+impl Debug for Console {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Console").finish()
+    }
 }
 
 impl Console {
