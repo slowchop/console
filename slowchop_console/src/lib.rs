@@ -23,7 +23,7 @@ mod render;
 mod subscriber;
 
 pub use crate::plugin::FunctionArgs;
-pub use crate::subscriber::slowchop_log_layer;
+pub use crate::subscriber::{slowchop_log_layer, slowchop_log_layer_unboxed};
 pub use error::Error;
 pub use plugin::{Console, ConsolePlugin};
 pub use shlex;

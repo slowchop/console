@@ -7,12 +7,14 @@ use bevy::prelude::*;
 use bevy::utils::tracing::{self, Subscriber};
 
 pub fn slowchop_log_layer(app: &mut App) -> Option<BoxedLayer> {
+    Some(Box::new(slowchop_log_layer_unboxed(app)))
+}
+
+pub fn slowchop_log_layer_unboxed(app: &mut App) -> CaptureLayer {
     let (sender, receiver) = mpsc::channel();
     let resource = CapturedLogEvents(receiver);
     app.insert_non_send_resource(resource);
-    let layer = CaptureLayer { sender };
-
-    Some(layer.boxed())
+    CaptureLayer { sender }
 }
 
 /// A basic message. This is what we will be sending from the [`CaptureLayer`] to [`CapturedLogEvents`] non-send resource.
@@ -38,9 +40,10 @@ pub(crate) fn transfer_log_events(
 
 /// This is the [`Layer`] that we will use to capture log events and then send them to Bevy's
 /// ECS via it's [`mpsc::Sender`].
-struct CaptureLayer {
+pub struct CaptureLayer {
     sender: mpsc::Sender<LogEvent>,
 }
+
 impl<S: Subscriber> Layer<S> for CaptureLayer {
     fn on_event(
         &self,
