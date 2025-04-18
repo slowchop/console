@@ -7,7 +7,7 @@ members = ["slowchop_console", "slowchop_console_derive"]
 slowchop_console_derive = { version = "0.1.2", path = "slowchop_console_derive" }
 slowchop_scripting = { path = "../grabby_aliens/slowchop_scripting" }
 
-bevy = { version = "0.15.2", default-features = false, features = [
+bevy = { version = "0.15", default-features = false, features = [
     "bevy_ui",
     "bevy_window",
 ] }
